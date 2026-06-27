@@ -1,0 +1,369 @@
+\documentclass[10pt,twocolumn]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{mathptmx}
+\usepackage{microtype}
+\usepackage[a4paper,margin=16mm,columnsep=6mm]{geometry}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xcolor}
+
+\graphicspath{{figures/}}
+\sisetup{detect-all,round-mode=places,round-precision=3,per-mode=symbol}
+
+\newcommand{\FI}{\mathrm{FI}}
+\newcommand{\etal}{et~al.}
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\keywords}[1]{\vspace{0.5em}\noindent\textbf{Keywords:} #1}
+
+\title{\bfseries Multi-Fidelity Correction of a Fast Type IV Composite Pressure Vessel Model using Dome-Resolved CalculiX Simulations}
+
+\author{Clément Dumeril\textsuperscript{1}}
+
+\date{June 2026}
+
+\begin{document}
+
+\twocolumn[
+\begin{@twocolumnfalse}
+\maketitle
+\begin{abstract}
+Fast analytical models are indispensable during the preliminary design phase of composite type IV pressure vessels (COPVs), but they suffer from intrinsic inaccuracies in the dome, dome--cylinder junction, and boss regions. In these areas, local curvature, fiber redistribution, and edge effects govern local failure. This report documents a multi-fidelity methodology aimed at calibrating an external corrector on the fast Python model, without modifying its source code, using a dome-resolved finite element reference in CalculiX. The sliding boss boundary conditions allow the axial elongation of the tank while suppressing rigid-body motions. The statistical analysis is based on a systematic campaign of 384 finite element cases (Dataset C). It shows that the geometric and kinematic discrepancy between the fast calculation and the CalculiX reference can be corrected by a multilayer perceptron (MLP), reducing the mean absolute error (MAE) to \num{0.102} (cross-validation $R^2 = \num{0.862}$). Verifications on the GA candidates and several bibliographic benchmarks indicate that the CalculiX fiber proxy is of the same order of magnitude as selected published pressure values, with a conservatism of approximately 8 to 12\% on the most comparable cases, supporting the use of the workflow as a numerical preliminary-design tool within the investigated domain.
+\end{abstract}
+\keywords{Type IV vessel; composite shell; CalculiX; dome modeling; multi-fidelity correction; multilayer perceptron; filament winding; pre-design}
+\vspace{1.0em}
+\end{@twocolumnfalse}
+]
+
+\footnotetext[1]{Arts et Métiers Institute of Technology. Project team: Clément Dumeril, Ilan Bruski, Elouan Bruneau, William Bueluot. Special thanks to my teammates for their contribution to the numerical testing campaigns and the structuring of the databases. Contribution (CRediT): C. Dumeril (Methodology, Writing, Modeling), I. Bruski (Data curation, Analysis), E. Bruneau (CalculiX simulation), W. Bueluot (Code validation).}
+
+\section{Introduction and Industrial Need}
+
+High-pressure hydrogen storage (typically 35 to 70 MPa) for clean mobility applications requires lightweight Type IV composite pressure vessels with high structural performance. These vessels consist of an internal leak-tight thermoplastic liner and a reinforced structural composite shell wound by filament (typically carbon/epoxy). During layup optimization phases, the use of genetic algorithms (GAs) requires the evaluation of tens of thousands of candidates.
+
+To this end, fast analytical or semi-analytical calculation codes based on Classical Laminate Theory (CLT) and cylindrical membrane approximations constitute the industrial standard. They allow predicting thickness and circumferential stresses in a few milliseconds. However, these simplified models omit the complex geometric variations of the dome (thickness evolution and geodesic fiber angle progression), bending discontinuities at the dome--cylinder junction, and local effects at the metal bosses.
+
+The objective of this study is to construct a multi-fidelity external correction layer for the fast model. To preserve the computational performance of the GA, the fast Python source code is not modified. Instead, we seek to calibrate a statistical interpolator (corrector) that re-evaluates stresses based on a two-dimensional (2.5D) shell finite element reference developed using the open-source finite element solver CalculiX.
+
+The global workflow is presented in Figure~\ref{fig:workflow}. The correction is trained on a design of experiments (DOE) of 384 solved physical cases and validated against experimental literature data to assess its mechanical relevance.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.92\textwidth]{fig_workflow_en.png}
+  \caption{Multi-fidelity scientific workflow. The fast Python model is preserved. CalculiX generates a finite element reference database of 384 dome-resolved cases, the discrepancy is learned externally by statistical regression, and experimental literature benchmarks provide a relative external consistency check before deployment on the genetic algorithm.}
+  \label{fig:workflow}
+\end{figure*}
+
+\section{Fast Model and Limitations}
+
+The fast Python design code represents the vessel by its cylindrical section as a closed thin membrane. Under an internal pressure $p$, for a nominal radius $r$ and a total thickness $t$, the nominal membrane stresses in the cylinder are estimated by:
+\begin{align}
+\sigma_{\theta} &= \frac{p r}{t}, &
+\sigma_{z} &= \frac{p r}{2t}.
+\label{eq:membrane}
+\end{align}
+
+The fast model applies these stresses to the nominal cylindrical stack via CLT. Although this calculation provides an excellent order of magnitude for sizing the cylinder, it suffers from major limitations:
+\begin{itemize}
+    \item It ignores geodesic filament winding, which governs the local evolution of the fiber angle $\alpha(r)$ along the dome according to Clairaut's law:
+    \begin{equation}
+    \sin\alpha(r) = \frac{r_b}{r},
+    \label{eq:clairaut}
+    \end{equation}
+    where $r_b$ is the boss radius.
+    \item It does not include the thickness gradient (material accumulates near the poles during winding).
+    \item It omits secondary bending and interlaminar shear stresses induced by curvature discontinuities at the dome--cylinder junction.
+\end{itemize}
+
+The failure evaluation in the fast model is therefore incomplete because it does not resolve these local critical points, typically forcing the user to introduce large, overly conservative empirical safety factors.
+
+\section{CalculiX Reference and Assumptions}
+
+To provide a higher-fidelity reference while maintaining moderate computational costs, a three-dimensional axisymmetric composite shell model was developed under CalculiX CrunchiX~\citep{CalculiX}.
+
+\subsection{Geometric and Structural Modeling}
+Each ply is discretized using eight-node quadratic shell elements (\code{S8R}) with reduced integration. The composite section is constructed element by element via the \code{*SHELL SECTION, COMPOSITE} card in order to specify the effective thickness and local geodesic orientation of each ply at each integration point of the shell.
+Figure~\ref{fig:composite-panel} illustrates the geometric modeling in CalculiX. The composite behavior is modeled in linear orthotropic elasticity via the \code{*ELASTIC, TYPE=ENGINEERING CONSTANTS} command.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.95\textwidth]{fig_composite_visual_panel.png}
+  \caption{Visualization of the CalculiX composite model. The panel illustrates the ply stacking, dome cross-section, winding trajectories, and local fiber orientation glyphs verified before running the solver.}
+  \label{fig:composite-panel}
+\end{figure*}
+
+For each ply $k$ of orientation $\theta_k$, the stress tensor in the global shell frame $\bm{\sigma}^{(k)}$ is transformed into the material frame of the fiber:
+\begin{equation}
+\bm{\sigma}^{(k)}_{\ell} = \bm{T}_{\sigma}(\theta_k)\,\bm{\sigma}^{(k)}\,\bm{T}_{\sigma}^{T}(\theta_k),
+\label{eq:stress-transform}
+\end{equation}
+which allows evaluating ply-level failure initiation indicators.
+
+\subsection{Boundary Conditions}
+The stress state near the dome is heavily dependent on the kinematic constraints applied to the metallic bosses. In this study, the sliding boss constraint (\code{single_boss_reference}) is implemented. The left boss is axially locked ($U_3 = 0$), while the right boss is left free to slide along the longitudinal axis ($U_3$ free) to allow natural elongation of the structure. Transverse rigid-body motions are eliminated by two local pin constraints.
+
+This choice is physically justified by the axial force balance under internal pressure $p$ on the internal area of the liner $A_i$:
+\begin{equation}
+F_{\mathrm{axial}} = p \pi R_i^2 = \sigma_z A_{\mathrm{composite}}.
+\label{eq:axial-balance}
+\end{equation}
+Locking both bosses axially (\code{both_boss_rings}) would prevent this natural elongation and induce artificial shear and compressive stresses. The sliding boss constraint is the standard numerically validated formulation to reproduce the membrane state of the cylinder~\citep{Kim2025, Jois2021}.
+
+\section{Dataset Origin and Fiber Observable}
+
+Statistical calibration requires comparing physically comparable quantities. Previous works relied on a global combined failure index (\code{max_combined}) grouping matrix, shear, and fiber failure modes. However, matrix failure indicators (cracking) reach their threshold at very low pressures and do not predict physical vessel burst (governed by fiber rupture). By calibrating against a pure fiber observable, the local fiber stress ratio for a ply $j$, denoted as $\FI_{\mathrm{fibre},j}$, is conditionally defined according to the sign of the longitudinal stress $\sigma_{11,j}$:
+\begin{equation}
+\FI_{\mathrm{fibre},j} = \begin{cases}
+\dfrac{\sigma_{11,j}}{X_T}, & \sigma_{11,j} \geq 0, \\[8pt]
+\dfrac{-\sigma_{11,j}}{X_C}, & \sigma_{11,j} < 0.
+\end{cases}
+\end{equation}
+The global observable $\FI_{\mathrm{fibre}}$ is then the maximum over all plies:
+\begin{equation}
+\FI_{\mathrm{fibre}} = \max_j \FI_{\mathrm{fibre},j}.
+\end{equation}
+
+Under this formulation, the correction factor returns to a physically coherent scale (between \num{1.0} and \num{1.8}) instead of aberrant scales (ranging from 100 to 600) due to local interlaminar shear in sharp bending angles.
+
+Three data campaigns were carried out during the project. Table~\ref{tab:doe-provenance} summarizes the origin of these databases. The main database used for training and statistical validation is \textbf{Dataset C}. Dataset C comprises 288 training cases, 48 classical holdout cases, 24 geometric boundary cases, and 24 pressure variation cases, totaling 384 cases.
+
+\begin{table*}[t]
+\centering
+\setlength{\tabcolsep}{3pt}
+\caption{Origin and characteristics of the project databases.}
+\label{tab:doe-provenance}
+\footnotesize
+\begin{tabular}{lcllll}
+\toprule
+\textbf{Dataset} & \textbf{Size} & \textbf{\shortstack{Boundary\\Conditions}} & \textbf{Observable} & \textbf{Role} & \textbf{\shortstack{Primary\\Critical Zones}} \\
+\midrule
+Dataset A & 128 cases & Double boss & Combined & Exploratory & Right Dome (86), Left Dome (22) \\
+Dataset B & 389 cases & Sliding boss & Fiber & Transition & -- \\
+\textbf{Dataset C} & \textbf{384 cases} & \textbf{Sliding boss} & \textbf{Fiber} & \textbf{Calibration} & \textbf{Left Dome (198), Cyl. (103), Junc. (56)} \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+The transition to the sliding boss boundary condition (Dataset C) shifts the peak fiber stress towards the left dome (198 cases) and the cylindrical shell (103 cases), as a consequence of the free axial deformation behavior.
+
+\begin{table*}[t]
+\centering
+\setlength{\tabcolsep}{3pt}
+\caption{Statistical benchmark of fiber stress corrector models on Dataset C.}
+\label{tab:benchmark-regressors-details}
+\footnotesize
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Model} & \textbf{\shortstack{Cross-Val.\\$R^2$}} & \textbf{\shortstack{Cross-Val.\\MAE}} & \textbf{\shortstack{Holdout\\$R^2$}} & \textbf{\shortstack{OOD Boundary\\$R^2$}} & \textbf{\shortstack{OOD Pressure\\$R^2$}} \\
+\midrule
+Conservative constant & \num{-3.910 +- 0.207} & \num{0.693 +- 0.004} & \num{-5.900} & \num{-2.270} & \num{-4.016} \\
+OLS (Standard linear) & \num{0.791 +- 0.047} & \num{0.129 +- 0.013} & \num{0.770} & \num{0.647} & \num{0.726} \\
+Ridge ($\alpha = 10.0$) & \num{0.796 +- 0.046} & \num{0.127 +- 0.013} & \num{0.787} & \num{0.672} & \num{0.703} \\
+\textbf{MLP Tanh (24x12)} & \textbf{\num{0.862 +- 0.029}} & \textbf{\num{0.102 +- 0.011}} & \textbf{\num{0.789}} & \textbf{\num{0.800}} & \textbf{\num{0.714}} \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\section{Mesh Study and Quantiles}
+
+Calculating the strict maximum stress at geometric boss junctions introduces numerical noise due to local singularities (sharp angles, liner/composite property discontinuities). To filter out these artificial peaks and evaluate mesh sensitivity, a comparative study was conducted on the Paik EX-A benchmark (experimental burst pressure of \SI{65.20}{MPa}) with three mesh densities: 16x16, 24x24, and 32x32.
+
+As documented in Figure~\ref{fig:mesh-convergence-paik}, the strict maximum stress oscillates non-monotonically (Mesh 24: \SI{48.28}{MPa}, Mesh 32: \SI{43.38}{MPa}), underestimating the burst pressure by more than 30\%. Conversely, the p99 quantile shows a monotonic evolution and lower mesh sensitivity than the strict maximum across the three studied resolutions (Mesh 16: \SI{53.40}{MPa}, Mesh 24: \SI{55.06}{MPa}, Mesh 32: \SI{58.56}{MPa}). However, an additional level of refinement would remain necessary to demonstrate rigorous asymptotic convergence, as the discrepancy between the 24x24 and 32x32 meshes remains above 6\%.
+
+Consequently, the p95 and p99 stress quantiles are adopted as stable spatial filters to dampen polar numerical singularities during corrector calibration.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\linewidth]{paik2023_mesh_convergence_en.png}
+  \caption{Mesh sensitivity (Paik EX-A). The strict maximum stress oscillates due to geometric singularities, while the p99 quantile shows a more stable and monotonic evolution.}
+  \label{fig:mesh-convergence-paik}
+\end{figure}
+
+\section{Corrector Benchmark}
+
+The corrector is defined by the local ratio $C_i$ between the CalculiX reference $\FI_i^{\mathrm{FE}}$ and the fast Python output $\FI_i^{\mathrm{fast}}$ for case $i$:
+\begin{equation}
+C_i = \frac{\FI_i^{\mathrm{FE}}}{\max(\FI_i^{\mathrm{fast}}, \epsilon)}.
+\label{eq:ratio}
+\end{equation}
+
+Four regression models were trained on Dataset C (288 training cases, 48 holdout cases, 48 out-of-distribution test cases) to predict $\log(C_i)$ from stratification and geometric descriptors. The performances under cross-validation ($k=8$, $R=4$) and on the test sets are summarized in Table~\ref{tab:benchmark-regressors-details}.
+
+The MLP obtains the best average performance in cross-validation and significantly improves generalization on the geometric OOD Boundary test ($R^2 = \num{0.800}$ vs. \num{0.672} for Ridge). However, its advantage is more limited on the classical holdout ($R^2 = \num{0.789}$ vs. \num{0.787} for Ridge) and is not confirmed on the OOD Pressure test, where OLS obtains a slightly superior performance ($R^2 = \num{0.726}$ vs. \num{0.714} for the MLP). The prediction scatter plot and the residuals histogram for the MLP are shown in Figures~\ref{fig:mlp-nuage} and \ref{fig:mlp-residus}.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.9\linewidth]{extended_benchmark_nuage_en.png}
+  \caption{Prediction vs. reference scatter plot for the MLP. The diagonal represents perfect agreement and provides a visual reference for assessing prediction dispersion.}
+  \label{fig:mlp-nuage}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.9\linewidth]{extended_benchmark_residus_en.png}
+  \caption{Distribution of prediction residuals for the MLP. Errors are centered and of moderate amplitude.}
+  \label{fig:mlp-residus}
+\end{figure}
+
+\section{GA Validation and Bibliographic Benchmarks}
+
+\subsection{GA Campaign Verification}
+The genetic algorithm (GA) optimization loop was executed subject to a fiber-stress constraint corrected by the MLP and supplemented with a p95 residual margin. Across 10 random seeds, 17 unique optimized candidates were obtained. Finite element analysis in CalculiX of these 17 candidates reveals that all evaluated GA candidates are conservative relative to the retained CalculiX observable. This result constitutes an encouraging end-to-end check in the tested optimization domain, but does not represent a guarantee of physical safety outside this domain.
+
+\subsection{Reconstruction of the Hu 2021 Benchmark}
+The 70 MPa Type IV tank without dome reinforcement from \citet{Hu2021} was modeled. Although the global combined CalculiX index is not directly comparable to experimental burst, the pure fiber observable located at the dome yields a first failed ply at a calculated pressure of \SI{148.7}{MPa}. This value is in the same range as the experimental first fiber damage pressure reported by the authors (\SI{161}{MPa}, relative error of -7.6\%).
+
+\subsection{Reconstruction of the Agne 2025 Benchmark}
+The benchmark from \citet{Agne2025} (type IV CNG tanks in fiberglass GFRP and carbon fiber CFRP) was reconstructed from the exact published layup data. Due to ambiguity in winding notations, both the total signed plies convention and the plus/minus pairs convention were tested. Figure~\ref{fig:agne-conventions} shows the effect of these conventions on the composite thickness.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.85\linewidth]{fig_agne_layer_count_conventions.png}
+  \caption{Impact of ply counting interpretations on the total shell thickness for the Agne 2025 benchmark.}
+  \label{fig:agne-conventions}
+\end{figure}
+
+The numerical results at 16x16 resolution are summarized in the technical appendices section to preserve the main structure. Under the total signed-ply convention, the relative error with respect to the experimental burst pressure is -11.5\% for the GFRP vessel and -10.5\% for the CFRP vessel. The shell model therefore remains within the same physical order of magnitude for the fiber-failure observables, with a conservative trend suitable for preliminary design.
+
+\subsection{Synthesis and Nature of Compared Quantities}
+It should be emphasized that the comparisons presented in this section provide a mechanical order of magnitude and not a homogeneous and rigorous experimental validation. The published quantities and reference numerical observables do not describe the same physical states, as summarized in Table~\ref{tab:comparison-nature}.
+
+\begin{table*}[t]
+\centering
+\caption{Comparison of the physical nature of published quantities and simulation indicators.}
+\label{tab:comparison-nature}
+\footnotesize
+\begin{tabular}{lrll}
+\toprule
+\textbf{Benchmark} & \textbf{Published Value} & \textbf{Nature of the Value} & \textbf{Compared CalculiX Observable} \\
+\midrule
+Hu~\citep{Hu2021} & \SI{161}{MPa} & First fiber damage / Burst & Fiber proxy $\FI_{\mathrm{fibre}}$ \\
+Agne GFRP~\citep{Agne2025} & \SI{29.39}{MPa} & Burst (progressive burst) & Elastic fiber proxy $\FI_{\mathrm{fibre}}$ \\
+Agne CFRP~\citep{Agne2025} & \SI{27.04}{MPa} & Burst (progressive burst) & Elastic fiber proxy $\FI_{\mathrm{fibre}}$ \\
+Paik EX-A~\citep{JinPaik2022} & \SI{65.2}{MPa} & Experimental burst & Fiber proxy p99 quantile $\FI_{\mathrm{fibre}}$ \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\section{Range of Validity and Limitations}
+
+The developed multi-fidelity correction constitutes a support tool for relative numerical pre-design and not an absolute guarantee of physical burst performance. The following limitations must be kept in mind:
+\begin{enumerate}
+    \item \textbf{Linear Elastic:} The CalculiX model resolves neither liner plasticity nor progressive composite degradation.
+    \item \textbf{Dome Approximation:} The dome is modeled as a spherical cap with a standard geodesic law. Real winding may deviate from this trajectory (tow slippage).
+    \item \textbf{p95 Margin:} The \texttt{p95} rule filters noise and secures optimization with respect to the finite element reference within the training domain. It is not a physical probability of survival of the actual structure.
+\end{enumerate}
+
+\section{Conclusion and Perspectives}
+
+This study demonstrates the viability of multi-fidelity external correction for the fast optimization of type IV composite pressure vessels. Calibration against a pure fiber observable on a 384-case finite element DOE (Dataset C) corrects the weaknesses of the fast model in the domes and junctions, while maintaining a millisecond-range calculation time for the GA. The multilayer perceptron (MLP) provides the best average cross-validation performance for modeling the nonlinear discrepancy (holdout $R^2 = \num{0.789}$, OOD Boundary $R^2 = \num{0.800}$), with all 17 evaluated GA candidates being conservative relative to the CalculiX reference.
+
+In the short term, before integrating contact modeling or complex 3D behaviors, the physical improvement priority lies in introducing a smooth layer coverage law in the dome. A progressive thickness transition via a smoothing function of the contribution of each ply $w_k(r)$ would eliminate current shell discontinuities and further refine the accuracy of the reference.
+
+\section{Code and Data Availability}
+
+Reproducibility is ensured by a documented repository structure:
+\begin{itemize}
+    \item \url{livrables/main_public_en.tex}: Source code of the technical report.
+    \item \url{livrables/references_public.bib}: Resolved bibliographical database.
+    \item \url{type4_calibration/calibration/extended_statistical_validation.py}: Statistical validation script.
+    \item \url{type4_calibration/outputs_11l_single_boss/comparison_tables/extended_statistical_metrics.json}: JSON containing learning metrics.
+    \item \url{livrables/README_REPRODUCTION.md}: Step-by-step instructions for study reproduction.
+\end{itemize}
+
+\section*{Acknowledgements}
+This document is an academic study and numerical pre-sizing report. It cannot be used as an industrial certification document without a campaign of physical burst and pressure tests in accordance with ISO 19881 standards and local regulations in force.
+
+\bibliographystyle{unsrtnat}
+\bibliography{references_public}\onecolumn
+\begin{center}
+  \Huge\bfseries Technical Appendices
+\end{center}
+\vspace{2.0em}
+
+\appendix
+
+\section{Historical 128-Case DOE}
+
+The preliminary historical study was conducted on 128 cases (Dataset A) under double boss locking conditions (\code{both_boss_rings}). The post-processing observable was the maximum combined Tsai-Wu index (\code{max_combined}). This campaign highlighted the critical role of the dome areas: the critical stress was located on the right dome in 86 cases, the left dome in 22 cases, and the junction in 20 cases, with no cases being controlled by the cylindrical shell. It was this historical finding that justified the development of a systematic external correction.
+
+\section{Material Properties}
+
+The multi-material extension of the pipeline relies on two unidirectional composite shell fibers. Their nominal mechanical and environmental properties are summarized in Table~\ref{tab:material-properties}.
+
+\begin{table}[h]
+\centering
+\caption{Mechanical and ecological properties of T800 carbon and basalt constituents.}
+\label{tab:material-properties}
+\small
+\begin{tabular}{lrr}
+\toprule
+\textbf{Mechanical Property} & \textbf{T800 Carbon Fiber / Epoxy} & \textbf{Basalt Fiber / Epoxy} \\
+\midrule
+Longitudinal modulus $E_1$ & \SI{176769}{MPa} & \SI{52000}{MPa} \\
+Transverse modulus $E_2$ & \SI{10335}{MPa} & \SI{14000}{MPa} \\
+Shear modulus $G_{12}$ & \SI{5430}{MPa} & \SI{5000}{MPa} \\
+Poisson's ratio $\nu_{12}$ & \num{0.280} & \num{0.250} \\
+Longitudinal tensile strength $X_T$ & \SI{3365}{MPa} & \SI{1200}{MPa} \\
+Transverse tensile strength $Y_T$ & \SI{97.0}{MPa} & \SI{40.0}{MPa} \\
+Shear strength $S_{12}$ & \SI{97.0}{MPa} & \SI{45.0}{MPa} \\
+Density $\rho$ & \SI{1580}{kg.m^{-3}} & \SI{2100}{kg.m^{-3}} \\
+Indicative material cost & \SI{30.0}{EUR/kg} & \SI{5.0}{EUR/kg} \\
+Indicative carbon footprint & \num{30.0} kg CO\textsubscript{2}/kg & \num{5.0} kg CO\textsubscript{2}/kg \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Exploratory Sensitivity Analysis}
+
+To test the stability of the MLP correction against manufacturing variations, a Monte Carlo sensitivity analysis (20 runs) was conducted. The elastic and strength properties of the carbon ply were randomly perturbed by $\pm 10$\%. Under these perturbations, the standard deviation of the maximum fiber index calculated under CalculiX is only 3.9\%. The worst-case scenario shows a CalculiX p95 index of \num{0.530}. Across the 20 exploratory realizations evaluated, the corrected prediction remains above the CalculiX p95 proxy. However, the small sample size does not allow for the deduction of a statistical confidence level or a probability of safety.
+
+\section{Local Stiffness Degradation Study}
+
+An exploratory simulation of local matrix softening was conducted on the Paik EX-A benchmark. The transverse and shear stiffnesses ($E_2, G_{12}$) of the helical plies in the dome and junction were reduced to 20\% of their nominal value to simulate intense matrix cracking.
+
+This load transfer increases the longitudinal stress in the carbon fibers and decreases the burst-pressure proxy based on allowable fiber stress from 43.380 to 34.810 MPa, corresponding to a reduction of 19.7\%. This exploratory result supports the use of a direct conservative calibration against the pure fiber observable, while avoiding unregularized progressive-damage laws in preliminary design loops.
+
+\section{Agne 2025 Benchmark Reconstruction}
+
+The strict results of the Agne 2025 table-exact 16x16 fiber proxy for the total signed plies configuration are reported in Table~\ref{tab:agne16-results}.
+
+\begin{table*}[h]
+  \centering
+  \caption{Strict results of the Agne 2025 table-exact 16x16 fiber proxy. Here $p_f$ is the pressure inferred from the maximum fiber stress ratio. The table should not be read as a final experimental validation because the shell model remains linear elastic and the layer counting convention is unresolved.}
+  \label{tab:agne16-results}
+  \resizebox{\textwidth}{!}{\input{tables/agne-summary.tex}}
+\end{table*}
+
+\section{Supplementary Visualizations}
+
+The graphical results of the exploratory material sensitivity (Monte Carlo) and local matrix softening studies are presented in Figures~\ref{fig:material-sensitivity} and \ref{fig:progressive-damage-probe}.
+
+\begin{figure*}[h]
+  \centering
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{material_sensitivity_sweep_en.png}
+    \caption{Sensitivity to random Monte Carlo variations of composite properties (20 runs).}
+    \label{fig:material-sensitivity}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{paik2023_progressive_damage_probe_en.png}
+    \caption{Fiber load transfer induced by local matrix stiffness softening.}
+    \label{fig:progressive-damage-probe}
+  \end{subfigure}
+  \caption{Visualization of exploratory composite analyses on domes and junctions.}
+\end{figure*}
+
+\end{document}

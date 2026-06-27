@@ -1,0 +1,366 @@
+\documentclass[10pt,twocolumn]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+\usepackage{mathptmx}
+\usepackage{microtype}
+\usepackage[a4paper,margin=16mm,columnsep=6mm]{geometry}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xcolor}
+
+\graphicspath{{figures/}}
+\sisetup{detect-all,round-mode=places,round-precision=3,per-mode=symbol}
+
+\newcommand{\FI}{\mathrm{FI}}
+\newcommand{\etal}{et~al.}
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\keywords}[1]{\vspace{0.5em}\noindent\textbf{Mots-clés :} #1}
+
+\title{\bfseries Correction multi-fidélité d'un modèle rapide de réservoir composite Type IV par simulations CalculiX résolues au dôme}
+
+\author{Clément Dumeril\textsuperscript{1}}
+
+\date{Juin 2026}
+
+\begin{document}
+
+\twocolumn[
+\begin{@twocolumnfalse}
+\maketitle
+\begin{abstract}
+Les modèles analytiques rapides sont indispensables lors de la phase préliminaire de conception des réservoirs sous pression composites de type IV (COPV), mais ils souffrent d'imprécisions intrinsèques dans les régions du dôme, de la jonction dôme--cylindre et de l'embase. C'est dans ces zones que la courbure, la redistribution des fibres et les effets de bord pilotent la rupture locale. Ce rapport documente une méthodologie multi-fidélité visant à calibrer un correcteur externe sur le modèle Python rapide, sans modifier son code source, à l'aide d'une référence éléments finis résolue au dôme sous CalculiX. Les conditions aux limites de pivot glissant permettent l’allongement axial du réservoir tout en supprimant les mouvements de corps rigide. L'analyse statistique s'appuie sur une campagne systématique de 384 cas résolus par éléments finis (Dataset C). Elle montre que l'écart géométrique et cinématique entre le calcul rapide et la référence CalculiX peut être corrigé par un perceptron multicouche (MLP), qui ramène l'erreur absolue moyenne (MAE) à \num{0.102} (validation croisée $R^2 = \num{0.862}$). Les vérifications sur les candidats GA et plusieurs benchmarks bibliographiques indiquent que le proxy fibre CalculiX se situe dans un ordre de grandeur compatible avec certaines pressions publiées, avec un conservatisme d’environ 8 à 12 \% sur les cas les plus comparables, qualifiant le flux de travail comme un outil d'aide au pré-dimensionnement numérique relatif.
+\end{abstract}
+\keywords{réservoir Type IV; enveloppe composite; CalculiX; modélisation de dôme; correction multi-fidélité; perceptron multicouche; enroulement filamentaire; pré-dimensionnement}
+\vspace{1.0em}
+\end{@twocolumnfalse}
+]
+
+\footnotetext[1]{Arts et Métiers Institute of Technology. Équipe de projet : Clément Dumeril, Ilan Bruski, Elouan Bruneau, William Bueluot. Remerciements particuliers à mes coéquipiers pour leur contribution aux campagnes d'essais numériques et à la structuration des bases de données. Contribution (CRediT) : C. Dumeril (Méthodologie, Rédaction, Modélisation), I. Bruski (Gestion des données, Analyse), E. Bruneau (Simulation CalculiX), W. Bueluot (Validation de code).}
+
+\section{Introduction et besoin industriel}
+
+Le stockage de l'hydrogène à haute pression (typiquement 35 à 70 MPa) pour les applications de mobilité propre nécessite des réservoirs composites de type IV légers et mécaniquement performants. Ces réservoirs se composent d'un liner thermoplastique interne étanche et d'une enveloppe composite structurale renforcée enroulée par filament (généralement en carbone/époxy). Lors des phases d'optimisation de l'empilement (layup), l'utilisation d'algorithmes génétiques (GA) impose d'évaluer des dizaines de milliers de candidats.
+
+À cette fin, les codes de calcul analytiques ou semi-analytiques rapides basés sur la théorie classique des stratifiés (CLT) et des approximations de membrane cylindrique constituent le standard industriel. Ils permettent de prédire l'épaisseur et les contraintes circonférentielles en quelques millisecondes. Cependant, ces modèles simplifiés omettent les variations géométriques complexes du dôme (évolution d'épaisseur et d'angle géodésique des fibres), les discontinuités de flexion à la jonction dôme--cylindre et les effets locaux au niveau des embases métalliques.
+
+L'objectif de cette étude est de construire une couche de correction externe multi-fidélité pour le modèle rapide. Pour préserver les performances de calcul du GA, le code source Python rapide n'est pas modifié. On cherche plutôt à calibrer un interpolateur statistique (correcteur) qui ré-évalue les contraintes sur la base d'une référence éléments finis bidimensionnelle (2.5D) par coques développée sous le code open-source CalculiX. 
+
+Le flux de travail global est présenté à la Figure~\ref{fig:workflow}. La correction est entraînée sur un plan d'expériences (DOE) de 384 cas physiques résolus et validée par rapport à des données expérimentales de la littérature pour évaluer sa pertinence mécanique.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.92\textwidth]{fig_workflow.png}
+  \caption{Flux de travail scientifique multi-fidélité. Le modèle Python rapide est conservé. CalculiX génère une base de données de référence de 384 cas résolus au dôme, l'écart est appris en externe par apprentissage statistique, et des benchmarks expérimentaux de la littérature valident la pertinence relative avant le déploiement sur l'algorithme génétique.}
+  \label{fig:workflow}
+\end{figure*}
+
+\section{Modèle rapide et limites}
+
+Le code de dimensionnement rapide Python représente le réservoir par sa section cylindrique sous forme de membrane mince fermée. Sous une pression interne $p$, pour un rayon nominal $r$ et une épaisseur totale $t$, les contraintes nominales de membrane dans la virole sont estimées par :
+\begin{align}
+\sigma_{\theta} &= \frac{p r}{t}, &
+\sigma_{z} &= \frac{p r}{2t}.
+\label{eq:membrane}
+\end{align}
+
+Le modèle rapide applique ces contraintes sur l'empilement cylindrique nominal via la CLT. Bien que ce calcul fournisse un excellent ordre de grandeur pour le dimensionnement de la virole, il souffre de limites majeures :
+\begin{itemize}
+    \item Il ignore l'enroulement filamentaire géodésique, qui régit l'évolution locale de l'angle des fibres $\alpha(r)$ le long du dôme selon la loi de Clairaut :
+    \begin{equation}
+    \sin\alpha(r) = \frac{r_b}{r},
+    \label{eq:clairaut}
+    \end{equation}
+    où $r_b$ est le rayon de l'embase.
+    \item Il n'inclut pas le gradient d'épaisseur (la matière s'accumule près des pôles lors de l'enroulement).
+    \item Il omet les contraintes secondaires de flexion et de cisaillement interlaminaire induites par les discontinuités de courbure à la jonction dôme--cylindre.
+\end{itemize}
+
+L'évaluation de la rupture dans le modèle rapide est donc incomplète car elle ne résout pas ces points critiques locaux, forçant généralement l'utilisateur à introduire des coefficients de sécurité empiriques massifs et pénalisants.
+
+\section{Référence CalculiX et hypothèses}
+
+Pour fournir une référence de plus haute fidélité tout en maintenant des coûts de calcul modérés, un modèle axisymétrique tridimensionnel par coques composites a été développé sous CalculiX CrunchiX~\citep{CalculiX}.
+
+\subsection{Modélisation géométrique et structure}
+Chaque pli est discrétisé à l'aide d'éléments coques quadratiques à huit nœuds (\code{S8R}) avec intégration réduite. La section composite est construite élément par élément via la carte \code{*SHELL SECTION, COMPOSITE} afin de spécifier l'épaisseur effective et l'orientation géodésique locale de chaque pli à chaque point d'intégration de la coque. 
+La Figure~\ref{fig:composite-panel} illustre la modélisation géométrique sous CalculiX. Le comportement du composite est modélisé en élasticité linéaire orthotrope via la commande \code{*ELASTIC, TYPE=ENGINEERING CONSTANTS}.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.95\textwidth]{fig_composite_visual_panel.png}
+  \caption{Visualisation du modèle composite CalculiX. Le panneau illustre l'empilement des plis, la vue en coupe du dôme, les trajectoires d'enroulement et les glyphes d'orientation locale des fibres vérifiés avant l'exécution du solveur.}
+  \label{fig:composite-panel}
+\end{figure*}
+
+Pour chaque pli $k$ d'orientation $\theta_k$, le tenseur de contraintes dans le repère global de la coque $\bm{\sigma}^{(k)}$ est transformé dans le repère matériel de la fibre :
+\begin{equation}
+\bm{\sigma}^{(k)}_{\ell} = \bm{T}_{\sigma}(\theta_k)\,\bm{\sigma}^{(k)}\,\bm{T}_{\sigma}^{T}(\theta_k),
+\label{eq:stress-transform}
+\end{equation}
+ce qui permet d'évaluer les indicateurs d'initiation de la rupture au niveau du pli.
+
+\subsection{Conditions aux limites}
+L'état de contrainte près du dôme est fortement tributaire des liaisons cinématiques appliquées aux embases métalliques. Dans cette étude, la liaison en pivot glissant (\code{single_boss_reference}) est implémentée. L'embase gauche est bloquée axialement ($U_3 = 0$), tandis que l'embase droite est laissée libre de glisser selon l'axe longitudinal ($U_3$ libre) pour autoriser l'allongement naturel de la structure. Les mouvements de corps rigide transverses sont éliminés par deux liaisons pivot locales.
+
+Ce choix est justifié physiquement par l'équilibre des forces axiales sous pression interne $p$ sur l'aire interne du liner $A_i$ :
+\begin{equation}
+F_{\mathrm{axial}} = p \pi R_i^2 = \sigma_z A_{\mathrm{composite}}.
+\label{eq:axial-balance}
+\end{equation}
+Bloquer axialement les deux embases (\code{both_boss_rings}) empêcherait cet allongement naturel et induirait des contraintes artificielles de cisaillement et de compression. La liaison pivot glissant est la formulation standard validée numériquement pour reproduire l'état membrane du cylindre~\citep{Kim2025, Jois2021}.
+
+\section{Provenance du DOE et observable fibre}
+
+Le recalage statistique nécessite de comparer des grandeurs physiquement comparables. Les travaux antérieurs s'appuyaient sur un indicateur de rupture combiné global (\code{max_combined}) regroupant les modes de matrice, de cisaillement et de fibre. Cependant, les indicateurs matriciels (fissuration) atteignent leur seuil à des pressions très basses et ne prédisent pas l'éclatement physique du réservoir (gouverné par la rupture des fibres). En se recalant sur un observable fibre pur, l'indice de contrainte de fibre local pour un pli $j$, noté $\FI_{\mathrm{fibre},j}$, est défini de manière conditionnelle selon le signe de la contrainte longitudinale $\sigma_{11,j}$ :
+\begin{equation}
+\FI_{\mathrm{fibre},j} = \begin{cases}
+\dfrac{\sigma_{11,j}}{X_T}, & \sigma_{11,j} \geq 0, \\[8pt]
+\dfrac{-\sigma_{11,j}}{X_C}, & \sigma_{11,j} < 0.
+\end{cases}
+\end{equation}
+L'observable global $\FI_{\mathrm{fibre}}$ est alors le maximum sur l'ensemble des plis :
+\begin{equation}
+\FI_{\mathrm{fibre}} = \max_j \FI_{\mathrm{fibre},j}.
+\end{equation}
+
+Sous cette formulation, le facteur de correction retrouve une échelle physiquement cohérente (comprise entre \num{1.0} et \num{1.8}) au lieu d'échelles aberrantes (allant de 100 à 600) dues au cisaillement interlaminaire local dans les angles de pliage abrupts.
+
+Trois campagnes de données ont été menées au cours du projet. Le Tableau~\ref{tab:doe-provenance} synthétise la provenance de ces bases. La base principale utilisée pour l'apprentissage et la validation statistique est la base \textbf{Dataset C}. Le Dataset C comprend 288 cas de rôle train, 48 cas de holdout classique, 24 cas de frontière géométrique et 24 cas de variation de pression, soit 384 cas au total.
+
+\begin{table*}[t]
+\centering
+\setlength{\tabcolsep}{3pt}
+\caption{Provenance et caractéristiques des bases de données du projet.}
+\label{tab:doe-provenance}
+\footnotesize
+\begin{tabular}{lcllll}
+\toprule
+\textbf{Dataset} & \textbf{Taille} & \textbf{Conditions Limites} & \textbf{Observable} & \textbf{Rôle} & \textbf{Zones Critiques Principales} \\
+\midrule
+Dataset A & 128 cas & Double boss (\code{both_boss_rings}) & Combiné (\code{max_combined}) & Exploratoire & Dôme Droit (86), Dôme Gauche (22) \\
+Dataset B & 389 cas & Pivot glissant (\code{single_boss}) & Fibre (\code{fiber_proxy}) & Transition & -- \\
+\textbf{Dataset C} & \textbf{384 cas} & \textbf{Pivot glissant} & \textbf{Fibre} (\code{fiber_proxy}) & \textbf{Calibrage statistique} & \textbf{Dôme G. (198), Virole (103), Jonction (56)} \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+La transition vers la condition de pivot glissant (Dataset C) décale le pic de contrainte fibre vers le dôme gauche (198 cas) et la virole cylindrique (103 cas), en raison du comportement mécanique de déformation axiale libre.
+
+\begin{table*}[t]
+\centering
+\setlength{\tabcolsep}{3pt}
+\caption{Benchmark statistique des modèles correcteurs de contrainte fibre sur le Dataset C.}
+\label{tab:benchmark-regressors-details}
+\footnotesize
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Modèle} & \textbf{\shortstack{Val. Croisée\\$R^2$}} & \textbf{\shortstack{Val. Croisée\\MAE}} & \textbf{\shortstack{Holdout\\$R^2$}} & \textbf{\shortstack{OOD Boundary\\$R^2$}} & \textbf{\shortstack{OOD Pressure\\$R^2$}} \\
+\midrule
+Constante conservative & \num{-3.910 +- 0.207} & \num{0.693 +- 0.004} & \num{-5.900} & \num{-2.270} & \num{-4.016} \\
+OLS (Linéaire standard) & \num{0.791 +- 0.047} & \num{0.129 +- 0.013} & \num{0.770} & \num{0.647} & \num{0.726} \\
+Ridge ($\alpha = 10.0$) & \num{0.796 +- 0.046} & \num{0.127 +- 0.013} & \num{0.787} & \num{0.672} & \num{0.703} \\
+\textbf{MLP Tanh (24x12)} & \textbf{\num{0.862 +- 0.029}} & \textbf{\num{0.102 +- 0.011}} & \textbf{\num{0.789}} & \textbf{\num{0.800}} & \textbf{\num{0.714}} \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\section{Étude de maillage et quantiles}
+
+Le calcul de la contrainte maximale stricte aux jonctions géométriques d'embase introduit du bruit numérique en raison des singularités locales (angles vifs, discontinuités de propriétés liner/composite). Pour filtrer ces pics artificiels et évaluer la sensibilité au maillage, une étude comparative a été menée sur le benchmark Paik EX-A (pression d'éclatement expérimentale de \SI{65.20}{MPa}) avec trois densités de maillage : 16x16, 24x24 et 32x32.
+
+Comme documenté à la Figure~\ref{fig:mesh-convergence-paik}, le maximum strict de contrainte oscille de manière non monotone (Mesh 24: \SI{48.28}{MPa}, Mesh 32: \SI{43.38}{MPa}), sous-estimant la pression d'éclatement de plus de 30 \%. À l'inverse, le quantile p99 présente une évolution monotone et une sensibilité au maillage plus faible que le maximum strict sur les trois résolutions étudiées (Mesh 16: \SI{53.40}{MPa}, Mesh 24: \SI{55.06}{MPa}, Mesh 32: \SI{58.56}{MPa}). Un niveau de raffinement supplémentaire resterait toutefois nécessaire pour démontrer une convergence asymptotique rigoureuse, l'écart entre les maillages 24x24 et 32x32 restant supérieur à 6 \%.
+
+Par conséquent, les quantiles de contrainte p95 et p99 sont adoptés comme filtres spatiaux stables pour amortir les singularités numériques polaires lors de la calibration des correcteurs.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\linewidth]{paik2023_mesh_convergence.png}
+  \caption{Sensibilité au maillage (Paik EX-A). Le maximum de contrainte strict oscille en raison des singularités géométriques, tandis que le quantile p99 présente une évolution plus stable et monotone.}
+  \label{fig:mesh-convergence-paik}
+\end{figure}
+
+\section{Benchmark des correcteurs}
+
+Le correcteur est défini par le ratio local $C_i$ entre la référence CalculiX $\FI_i^{\mathrm{FE}}$ et la sortie Python rapide $\FI_i^{\mathrm{fast}}$ pour le cas $i$ :
+\begin{equation}
+C_i = \frac{\FI_i^{\mathrm{FE}}}{\max(\FI_i^{\mathrm{fast}}, \epsilon)}.
+\label{eq:ratio}
+\end{equation}
+
+Quatre modèles de régression ont été entraînés sur le Dataset C (288 cas d'entraînement, 48 cas de holdout, 48 cas de test hors-distribution) pour prédire $\log(C_i)$ à partir des descripteurs de stratification et géométriques. Les performances en validation croisée ($k=8$, $R=4$) et sur les ensembles de test sont résumées dans le Tableau~\ref{tab:benchmark-regressors-details}.
+
+Le MLP obtient la meilleure performance moyenne en validation croisée et améliore nettement la généralisation sur le test géométrique OOD Boundary ($R^2 = \num{0.800}$ contre \num{0.672} pour Ridge). Son avantage est en revanche plus limité sur le holdout classique ($R^2 = \num{0.789}$ contre \num{0.787} pour Ridge) et n'est pas confirmé sur le test OOD Pressure, où OLS obtient une performance légèrement supérieure ($R^2 = \num{0.726}$ contre \num{0.714} pour le MLP). Les graphiques de prédiction et l'histogramme des résidus du MLP sont présentés aux Figures~\ref{fig:mlp-nuage} et \ref{fig:mlp-residus}.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.9\linewidth]{extended_benchmark_nuage.png}
+  \caption{Nuage de points prédiction vs. référence pour le MLP. La diagonale parfaite indique un excellent recalage sur l'observable fibre.}
+  \label{fig:mlp-nuage}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.9\linewidth]{extended_benchmark_residus.png}
+  \caption{Distribution des résidus de prédiction du MLP. Les erreurs sont centrées et d'amplitude modérée.}
+  \label{fig:mlp-residus}
+\end{figure}
+
+\section{Validation GA et benchmarks bibliographiques}
+
+\subsection{Vérification de la campagne GA}
+La boucle d'optimisation par algorithme génétique (GA) a été exécutée sous une contrainte de contrainte fibre sécurisée par la prédiction MLP et sa règle de marge \texttt{p95} (quantile 95 \% des résidus). Sur 10 graines aléatoires, 17 candidats uniques optimisés ont été obtenus. L'analyse par éléments finis sous CalculiX de ces 17 candidats révèle que tous les candidats GA évalués sont conservatifs relativement à l’observable CalculiX retenu. Ce résultat constitue une vérification bout-en-bout encourageante dans le domaine d’optimisation testé, mais ne représente pas une garantie de sécurité physique hors de ce domaine.
+
+\subsection{Reconstruction du benchmark Hu 2021}
+Le réservoir Type IV de 70 MPa sans renforcement de dôme de \citet{Hu2021} a été modélisé. Bien que l'indice combiné global CalculiX n'est pas directement comparable à l'éclatement expérimental, l'observable fibre pur localisé au dôme donne un premier pli rompu à une pression calculée de \SI{148.7}{MPa}. Cette valeur se situe dans la même échelle que la pression expérimentale de premier endommagement fibre rapportée par les auteurs (\SI{161}{MPa}, erreur relative de -7,6 \%).
+
+\subsection{Reconstruction du benchmark Agne 2025}
+Le benchmark de \citet{Agne2025} (réservoirs GNC de type IV en fibre de verre GFRP et fibre de carbone CFRP) a été reconstruit à partir des données exactes de stratification publiées. En raison de l'ambiguïté des notations d'enroulement, la convention des plis signés totaux et celle des paires plus/moins ont été testées. La Figure~\ref{fig:agne-conventions} montre l'effet de ces conventions sur l'épaisseur du composite.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.85\linewidth]{fig_agne_layer_count_conventions.png}
+  \caption{Impact des interprétations de comptage des plis sur l'épaisseur totale de coque pour le benchmark Agne 2025.}
+  \label{fig:agne-conventions}
+\end{figure}
+
+Les résultats numériques à la résolution 16x16 sont résumés dans la section des annexes techniques pour préserver la structure principale. Sous la convention des plis signés totaux, l'erreur relative par rapport à la pression d'éclatement expérimentale est de -11,5 \% pour le GFRP et de -10,5 \% pour le CFRP. Le modèle par coque se situe donc dans le même ordre de grandeur physique pour les observables de rupture de fibre, avec une tendance conservative appropriée pour le pré-dimensionnement.
+
+\subsection{Synthèse et nature des grandeurs comparées}
+Il convient de souligner que les comparaisons présentées dans cette section fournissent un ordre de grandeur mécanique et non une validation expérimentale homogène et rigoureuse. Les grandeurs publiées et les observables numériques de référence ne décrivent pas les mêmes états physiques, comme le résume le Tableau~\ref{tab:comparison-nature}.
+
+\begin{table*}[t]
+\centering
+\caption{Comparaison de la nature physique des grandeurs publiées et des indicateurs de simulation.}
+\label{tab:comparison-nature}
+\footnotesize
+\begin{tabular}{lrll}
+\toprule
+\textbf{Benchmark} & \textbf{Valeur Publiée} & \textbf{Nature de la Valeur} & \textbf{Observable CalculiX Comparé} \\
+\midrule
+Hu~\citep{Hu2021} & \SI{161}{MPa} & Premier dommage fibre / Burst & Proxy fibre $\FI_{\mathrm{fibre}}$ \\
+Agne GFRP~\citep{Agne2025} & \SI{29.39}{MPa} & Éclatement (burst progressif) & Proxy fibre élastique $\FI_{\mathrm{fibre}}$ \\
+Agne CFRP~\citep{Agne2025} & \SI{27.04}{MPa} & Éclatement (burst progressif) & Proxy fibre élastique $\FI_{\mathrm{fibre}}$ \\
+Paik EX-A~\citep{JinPaik2022} & \SI{65.2}{MPa} & Éclatement expérimental & Quantile p99 proxy fibre $\FI_{\mathrm{fibre}}$ \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\section{Domaine de validité et limites}
+
+La correction multi-fidélité développée constitue une couche d'aide au pré-dimensionnement numérique relatif et non une garantie absolue de tenue physique à l'éclatement. Les limites suivantes doivent être gardées à l'esprit :
+\begin{enumerate}
+    \item \textbf{Élastique linéaire :} Le modèle CalculiX ne résout ni la plasticité du liner, ni la dégradation progressive du composite.
+    \item \textbf{Approximation de dôme :} Le dôme est modélisé par une calotte sphérique avec une loi géodésique standard. L'enroulement réel peut s'écarter de cette trajectoire (glissement des mèches).
+    \item \textbf{Marge p95 :} La règle \texttt{p95} filtre le bruit et sécurise l'optimisation par rapport à la référence éléments finis dans le domaine d'apprentissage. Elle n'est pas une probabilité physique de survie de la structure réelle.
+\end{enumerate}
+
+\section{Conclusion et perspectives}
+
+Cette étude démontre la viabilité de la correction externe multi-fidélité pour l'optimisation rapide de réservoirs composites de type IV. Le recalage sur un observable de fibre pur sur un DOE de 384 cas résolus (Dataset C) permet de corriger les faiblesses du modèle rapide dans les dômes et les jonctions, tout en maintenant un temps de calcul de l'ordre de la milliseconde pour le GA. Le perceptron multicouche (MLP) modélise avec succès l'écart non-linéaire (holdout $R^2 = \num{0.789}$, OOD Boundary $R^2 = \num{0.800}$), les 17 candidats GA évalués étant conservatifs relativement à la référence CalculiX.
+
+À court terme, avant d'intégrer des modélisations de contact ou des comportements 3D complexes, la priorité d'amélioration physique réside dans l'introduction d'une loi de couverture douce des couches dans le dôme. Une transition progressive de l'épaisseur via une fonction d'adoucissement de la contribution de chaque pli $w_k(r)$ permettrait de supprimer les discontinuités de coque actuelles et d'affiner encore la précision de la référence.
+
+\section{Disponibilité du code et des données}
+
+La reproductibilité est assurée par une structure de dépôt documentée :
+\begin{itemize}
+    \item \url{livrables/main_public_fr.tex} : Source du rapport technique.
+    \item \url{livrables/references_public.bib} : Base bibliographique résolue.
+    \item \url{type4_calibration/calibration/extended_statistical_validation.py} : Script de validation statistique.
+    \item \url{type4_calibration/outputs_11l_single_boss/comparison_tables/extended_statistical_metrics.json} : JSON des métriques d'apprentissage.
+    \item \url{livrables/README_REPRODUCTION.md} : Instructions pas à pas pour la reproduction de l'étude.
+\end{itemize}
+
+\section*{Remerciements}
+Ce document est un rapport d'étude académique et de pré-dimensionnement numérique. Il ne saurait être utilisé comme document de certification industrielle sans une campagne d'essais physiques de rupture et d'éclatement sous pression conformément aux normes ISO 19881 et aux réglementations locales en vigueur.
+
+\bibliographystyle{unsrtnat}
+\bibliography{references_public}
+
+\onecolumn
+\appendix
+
+\section{DOE historique de 128 cas (Dataset A)}
+
+L'étude historique préliminaire a été menée sur 128 cas (Dataset A) sous conditions de double blocage d'embase (\code{both_boss_rings}). L'observable de post-traitement était l'indice combiné Tsai-Wu maximal (\code{max_combined}). Cette campagne a mis en évidence le rôle critique des zones de dôme : la contrainte critique se situait sur le dôme droit dans 86 cas, le dôme gauche dans 22 cas et la jonction dans 20 cas, aucun cas n'étant contrôlé par la virole cylindrique. C'est ce constat historique qui a justifié le développement d'une correction externe systématique.
+
+\section{Détails des propriétés matériaux (T800 / Basalte / Hybrides)}
+
+L'extension multi-matériau de la pipeline s'appuie sur deux fibres unidirectionnelles d'enveloppe composite. Leurs propriétés mécaniques et environnementales nominales sont récapitulées dans le Tableau~\ref{tab:material-properties}.
+
+\begin{table}[h]
+\centering
+\caption{Propriétés mécaniques et écologiques des constituants carbone T800 et basalte.}
+\label{tab:material-properties}
+\small
+\begin{tabular}{lrr}
+\toprule
+\textbf{Propriété mécanique} & \textbf{Fibre de carbone T800 / Époxy} & \textbf{Fibre de Basalte / Époxy} \\
+\midrule
+Module longitudinal $E_1$ & \SI{176769}{MPa} & \SI{52000}{MPa} \\
+Module transversal $E_2$ & \SI{10335}{MPa} & \SI{14000}{MPa} \\
+Module de cisaillement $G_{12}$ & \SI{5430}{MPa} & \SI{5000}{MPa} \\
+Coefficient de Poisson $\nu_{12}$ & \num{0.280} & \num{0.250} \\
+Résistance en traction longitudinale $X_T$ & \SI{3365}{MPa} & \SI{1200}{MPa} \\
+Résistance en traction transversale $Y_T$ & \SI{97.0}{MPa} & \SI{40.0}{MPa} \\
+Résistance au cisaillement $S_{12}$ & \SI{97.0}{MPa} & \SI{45.0}{MPa} \\
+Masse volumique $\rho$ & \SI{1580}{kg.m^{-3}} & \SI{2100}{kg.m^{-3}} \\
+Coût matière indicatif & \SI{30.0}{EUR/kg} & \SI{5.0}{EUR/kg} \\
+Contenu carbone indicatif & \num{30.0} kg CO\textsubscript{2}/kg & \num{5.0} kg CO\textsubscript{2}/kg \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Analyse exploratoire de sensibilité aléatoire sur 20 réalisations}
+
+Pour tester la stabilité de la correction MLP face aux variations de fabrication, une analyse de type Monte Carlo (20 tirages) a été conduite. Les propriétés élastiques et de résistance du pli carbone ont été perturbées aléatoirement de $\pm 10$ \%. Sous ces perturbations, l'écart-type de l'indice de fibre maximal calculé sous CalculiX est de seulement 3,9 \%. Le cas le plus défavorable affiche un indice CalculiX p95 de \num{0.530}. Sur les 20 réalisations exploratoires évaluées, la prédiction corrigée reste supérieure au proxy CalculiX p95. La taille réduite de l'échantillon ne permet toutefois pas d'en déduire un niveau de confiance statistique ou une probabilité de sécurité.
+
+\section{Étude exploratoire de dégradation locale de rigidité}
+
+Une simulation exploratoire d'adoucissement local de la matrice a été menée sur le benchmark Paik EX-A. Les rigidités transverses et de cisaillement ($E_2, G_{12}$) des plis hélicoïdaux dans le dôme et la jonction ont été réduites à 20 \% de leur valeur nominale pour simuler une fissuration matricielle intense. 
+
+Cette dégradation de la matrice reporte mécaniquement les efforts sur les fibres porteuses axiales. Dans le modèle par coques, ce report de charge augmente la contrainte longitudinale dans la fibre de carbone, et fait chuter la pression d'éclatement par contrainte fibre admissible de \num{43.38} à \SI{34.81}{MPa} (-19,7 \%). Cet adoucissement local valide le choix d'un recalage direct et conservatif sur l'observable fibre pur pour éviter de complexifier le modèle avec des lois d'endommagement progressif non régulées dans les boucles préliminaires de conception.
+
+\section{Reconstruction numérique détaillée du benchmark Agne 2025}
+
+Les résultats stricts du proxy de fibre 16x16 table-exacte Agne 2025 pour la configuration à plis signés totaux sont reportés dans le Tableau~\ref{tab:agne16-results}. 
+
+\begin{table*}[h]
+  \centering
+  \caption{Résultats stricts du proxy de fibre 16x16 table-exacte Agne 2025. Ici $p_f$ est la pression déduite du ratio de contrainte de fibre maximum. Le tableau ne doit pas être lu comme une validation expérimentale finale car le modèle de coque reste élastique linéaire et la convention de comptage des couches n'est pas résolue.}
+  \label{tab:agne16-results}
+  \resizebox{\textwidth}{!}{\input{tables/agne-summary_fr.tex}}
+\end{table*}
+
+\section{Visualisation des analyses exploratoires composites}
+
+Les résultats graphiques des études exploratoires de sensibilité matériau (Monte Carlo) et d'adoucissement matriciel local sont présentés aux Figures~\ref{fig:material-sensitivity} et \ref{fig:progressive-damage-probe}.
+
+\begin{figure*}[h]
+  \centering
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{material_sensitivity_sweep.png}
+    \caption{Sensibilité aux variations aléatoires Monte Carlo de propriétés composites (20 tirages).}
+    \label{fig:material-sensitivity}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\linewidth]{paik2023_progressive_damage_probe.png}
+    \caption{Report d'efforts sur la fibre induit par un adoucissement local de la rigidité matricielle.}
+    \label{fig:progressive-damage-probe}
+  \end{subfigure}
+  \caption{Visualisation des analyses exploratoires du composite sur les dômes et les jonctions.}
+\end{figure*}
+
+\end{document}
