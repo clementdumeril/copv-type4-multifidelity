@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -12,7 +13,8 @@ sys.path.insert(0, str(ROOT))
 from calibration_utils import SIM_RESULTS, ensure_dirs, flatten_case, load_cases, write_csv, write_json  # noqa: E402
 
 
-PYTHON = Path(r"C:\Program Files\FreeCAD 1.1\bin\python.exe")
+# Python interpreter used to build the cases (FreeCAD's on Windows); override with FREECAD_PYTHON.
+PYTHON = Path(os.environ.get("FREECAD_PYTHON", r"C:\Program Files\FreeCAD 1.1\bin\python.exe"))
 if not PYTHON.exists():
     PYTHON = Path(sys.executable)
 

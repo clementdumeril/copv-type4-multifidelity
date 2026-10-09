@@ -44,7 +44,7 @@ FIG_DIR = ROOT.parent / "reports" / "figures"
 
 
 def element_fiber_index(case: dict, case_dir: Path) -> dict[int, float]:
-    """Worst-ply fibre stress ratio |sigma_11| / X per shell element (ply-mean stresses)."""
+    """Worst-ply fiber stress ratio |sigma_11| / X per shell element (ply-mean stresses)."""
     frd = case_dir / f"{case['case_id']}_calculix_composite.frd"
     nodes = parse_frd_nodes(frd)
     stress_rows = parse_stress_rows(frd)
@@ -52,7 +52,13 @@ def element_fiber_index(case: dict, case_dir: Path) -> dict[int, float]:
     layup = make_layup(case)
     materials = case_materials(load_materials(), case)
 
+    # Same mapping as postprocess_calculix_case.py: section points closer than a small
+    # tolerance to a ply interface are skipped. In a few cylinder rings every section
+    # point sits on an interface, which would leave those elements empty; for display
+    # only, they fall back to the unfiltered points (`loose`). The DOE values are unchanged.
+    zero = ("sxx", "syy", "szz", "sxy", "syz", "sxz")
     sums: dict[tuple[int, int], list] = {}
+    loose: dict[tuple[int, int], list] = {}
     last = None
     for stress in stress_rows:
         point = nodes.get(int(stress["node_id"]))
@@ -63,19 +69,21 @@ def element_fiber_index(case: dict, case_dir: Path) -> dict[int, float]:
         r = (point[0] ** 2 + point[1] ** 2) ** 0.5
         plies = active_layup(case, element["zone"], float(element["r"]), layup)
         eps = boundary_epsilon_mm(element, plies)
-        if any(abs(r - b) < eps for b in compute_ply_boundary_radii(element, plies)):
-            continue
+        on_interface = any(abs(r - b) < eps for b in compute_ply_boundary_radii(element, plies))
         ply = assign_ply_from_thickness_position(r, element, plies)
         key = (element["element_id"], int(ply["ply"]))
-        if key not in sums:
-            sums[key] = [element, ply, {k: 0.0 for k in ("sxx", "syy", "szz", "sxy", "syz", "sxz")}, 0]
-        acc = sums[key]
-        for k in acc[2]:
-            acc[2][k] += float(stress[k])
-        acc[3] += 1
+        for target, use in ((sums, not on_interface), (loose, True)):
+            if not use:
+                continue
+            acc = target.setdefault(key, [element, ply, {k: 0.0 for k in zero}, 0])
+            for k in zero:
+                acc[2][k] += float(stress[k])
+            acc[3] += 1
 
+    filled = {element_id for element_id, _ in sums}
+    buckets = list(sums.items()) + [(key, acc) for key, acc in loose.items() if key[0] not in filled]
     worst: dict[int, float] = {}
-    for (element_id, _), (element, ply, total, n) in sums.items():
+    for (element_id, _), (element, ply, total, n) in buckets:
         mean = {k: v / n for k, v in total.items()}
         angle = local_ply_angle_deg(ply, element["zone"], float(element["r"]), float(element["geodesic_angle_deg"]), case)
         s1, s2, t12 = project_stress(mean, element["meridional"], element["circumferential"], angle)
@@ -129,9 +137,9 @@ for preset in ("Inferno", "Inferno (matplotlib)", "Viridis (matplotlib)"):
     except RuntimeError:
         pass
 lut.RescaleTransferFunction(0.0, {vmax})
-disp.SetScalarBarVisibility(view, True)
+disp.SetScalarBarVisibility(view, False)  # colorbar is drawn by make_readme_figures.py
 bar = GetScalarBar(lut, view)
-bar.Title = "fibre index |s11|/X"
+bar.Title = "|σ11|/X"
 bar.ComponentTitle = ""
 bar.TitleColor = [0, 0, 0]
 bar.LabelColor = [0, 0, 0]
