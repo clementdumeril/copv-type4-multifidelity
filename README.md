@@ -3,9 +3,9 @@
 A Type IV hydrogen tank optimizer used a fast analytical model that only sees the cylinder. I built a CalculiX composite-shell model of the whole vessel, 384 cases were solved with it, and I trained a small MLP that corrects the fast model's fiber failure index (cross-validated R² 0.862 on log C, against 0.796 for Ridge).
 
 ![CalculiX fiber failure index on one 11 L vessel, and where the peak falls across the 384 cases](reports/figures/readme_hero.png)
-*Left: fiber index |σ11|/X (worst ply per element) for case `11l_0122` at 70 MPa, rendered from the CalculiX result. The peak sits at the polar opening of the dome on the axially fixed boss. Right: critical zone over the 384 cases. The fast model always reports the cylinder.*
+*Left: fiber index |σ11|/X (worst ply per element) for case `11l_0122` at 70 MPa, rendered from the CalculiX result. The peak sits at the polar opening of the dome on the axially fixed boss, in a hoop ply (see Limitations). Right: critical zone over the 384 cases. The fast model always reports the cylinder.*
 
-Student project, May to June 2026. The starting point was a 2025 genetic-algorithm layup optimizer whose mechanics are a thick multilayer cylinder (Lekhnitskii) with Hashin, Tsai-Wu and Puck criteria, evaluated in under a millisecond. It models neither the dome nor the boss, and burst often starts in the dome. The question was how to make the optimizer account for the dome without slowing it down or changing its code.
+Four-student project at Arts et Métiers, May to June 2026. The starting point was a 2025 genetic-algorithm layup optimizer whose mechanics are a thick multilayer cylinder (Lekhnitskii) with Hashin, Tsai-Wu and Puck criteria, evaluated in under a millisecond. It models neither the dome nor the boss, and burst often starts in the dome. The question was how to make the optimizer account for the dome without slowing it down or changing its code.
 
 Skills: CalculiX (S8R composite shells), NumPy MLP with hand-written backprop/Adam, DOE, repeated k-fold CV, ParaView.
 
@@ -30,7 +30,7 @@ Without correction, the fast model underestimates the CalculiX fiber index on al
 
 ## What I built
 
-The optimizer and the fast model come from a 2025 codebase ([Credits](#credits)). The code below is in this repository.
+The optimizer and fast model come from a 2025 codebase. I designed the method and wrote the code linked below; teammates ran part of the CalculiX campaign and curated data ([Credits](#credits)). [TODO Clément: confirm or correct this split. Who wrote which scripts? Who ran which CalculiX cases (first DOE, 11 L DOE, benchmarks)? Who curated which datasets? What did "code validation" cover?]
 
 - **CalculiX vessel model** ([`generate_calculix_composite_case.py`](code/high_fidelity/generate_calculix_composite_case.py)). Cylinder, dome and polar boss are meshed as S8R composite shells. The winding angle follows Clairaut's geodesic law, sin α = r_b / r, and the thickness builds up towards the pole. One boss is fixed axially and the other slides. [`postprocess_calculix_case.py`](code/high_fidelity/postprocess_calculix_case.py) reads the results, averages the stress per ply and rotates it into the fiber frame.
 - **Two DOEs.** The first had 128 cases of varying size. The second has 384 cases at a fixed 11 L volume ([`generate_doe_11l.py`](code/config/generate_doe_11l.py)), all solved in CalculiX. Ranges are in [docs/VALIDATION.md](docs/VALIDATION.md).
@@ -65,6 +65,7 @@ Details, the mesh study and the contact test are in [docs/VALIDATION.md](docs/VA
 
 - The shells are linear elastic. The model has no progressive damage, no liner plasticity and no liner/boss contact in the DOE.
 - The peak at the polar opening depends on the mesh, which is why the GA check passes at p95 but not at the maximum.
+- In 179 of the 198 dome-critical cases the peak is in a hoop ply. The coverage model keeps 20 to 35 % of the hoop thickness, at its ~88° angle, down to the polar opening, which real winding would not. Part of the dome peak may be a modelling artefact. [TODO Clément: validate this wording.]
 - The peak lands on the fixed-boss dome in 198 of 384 cases and never on the sliding side, so part of the dome effect comes from the boundary condition.
 - All cases belong to one vessel family: 11 L, single boss, geodesic winding, carbon/epoxy.
 - The DLR 2025 test is not reproduced, so the absolute fiber index should not be read as a burst prediction.
@@ -82,7 +83,8 @@ Re-running CalculiX cases needs CalculiX 2.23 (set `CCX` and `FREECAD_PYTHON` if
 
 ## Credits
 
-- Genetic-algorithm optimizer and fast analytical model: 2025 codebase, not included here.
+- Teammates: Ilan Bruski (data curation, analysis), Elouan Bruneau (CalculiX simulation), William Bueluot (code validation). Roles as listed in the report; [TODO Clément: confirm].
+- Genetic-algorithm optimizer and fast analytical model: 2025 codebase, not included here. [TODO Clément: who wrote it, and did you contribute?]
 - [CalculiX](http://www.calculix.de/) 2.23 and ParaView.
 - Published tests: Hu, Chen & Pan, *Int. J. Hydrogen Energy* (2021); Agne et al., *Composite Structures* (2025); Jin, Cheng, Bai, Paik & Li, *Ships and Offshore Structures* (2022); Lueders, Ropte, Schmidt & Liebisch, *Data in Brief* (2025). See [`reports/references_public.bib`](reports/references_public.bib).
 
