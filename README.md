@@ -1,256 +1,86 @@
-# Multi-Fidelity Structural Optimization of Type IV Hydrogen Pressure Vessels
+# Correcting a fast pressure-vessel sizing model with 384 CalculiX simulations
 
-> A dome-resolved finite-element reference corrects a sub-millisecond analytical sizing model for composite vessel optimization.  
-> 384 CalculiX simulations · geodesic composite winding · statistical correction · genetic optimization · FE verification
+A Type IV hydrogen tank optimizer used a fast analytical model that only sees the cylinder. I built a CalculiX composite-shell model of the whole vessel, ran 384 cases, and trained a small MLP that corrects the fast model's fibre failure index (cross-validated R² 0.862 on log C, against 0.796 for Ridge).
 
-![Finite-element composite shell model of a Type IV vessel showing geodesic winding trajectories and local ply fiber orientation glyphs](reports/figures/composite_cal_001_fiber_orientation_glyphs.png)
-*Figure 1: Finite-element discretization of a Type IV composite vessel in CalculiX, showing quadratic shell elements (S8R), geodesic winding paths, and local material-frame fiber orientation glyphs across the dome.*
+![CalculiX fibre failure index on one 11 L vessel, and where the peak falls across the 384 cases](reports/figures/readme_hero.png)
+*Left: fibre index |σ11|/X (worst ply per element) for case `11l_0122` at 70 MPa, rendered from the CalculiX result. The peak (0.86) sits in the ring of elements at the polar opening of the dome on the axially fixed boss; the fast model gives 0.42 for this design. Grey: two rings of cylinder elements that no stress sample was mapped to in post-processing (missing data, not zero stress). Right: critical zone over the 384 cases. The fast model always reports the cylinder.*
 
----
+Student research project, May to June 2026, cleaned up for publication over the summer. The starting point was a genetic-algorithm layup optimizer written by a team in 2025. Its mechanics are a thick multilayer anisotropic cylinder (Lekhnitskii) with Hashin, Tsai-Wu and Puck criteria. It runs in under a millisecond, but it has no dome, no polar boss and no winding-angle variation, and that is where filament-wound vessels usually fail. The question was whether the optimizer could be made aware of the dome without slowing it down or touching its code.
 
-## Key Results at a Glance
+## Results
 
-- **384 dome-resolved FE cases** generated under sliding-boss kinematic boundary conditions (Dataset C).
-- **MLP cross-validation $R^2 = 0.862 \pm 0.029$** and **$\text{MAE} = 0.102 \pm 0.011$** across 8-fold repeated cross-validation, improving $R^2$ by 0.066 over Ridge ($0.796 \pm 0.046$).
-- **17/17 GA-optimized candidates conservative** relative to the retained CalculiX fiber observable upon full finite-element re-analysis.
+Correction factor C = FI(CalculiX) / FI(fast model), predicted from the design inputs. Metrics are on log C, from [`data/extended_statistical_metrics.json`](data/extended_statistical_metrics.json).
 
-> [!NOTE]  
-> Conservatism on 17/17 candidates relative to the retained FE observable is an encouraging numerical consistency check in the investigated design space; it does not constitute a physical safety certification or a burst safety guarantee.
+| | Ridge (α = 10) | MLP 24×12 tanh |
+|---|---:|---:|
+| R², repeated 8-fold CV on the 288 training cases | 0.796 ± 0.046 | 0.862 ± 0.029 |
+| R², 96 held-out cases | 0.727 | 0.778 |
+| R², 24 cases at the edge of the geometric domain | 0.672 | 0.800 |
+| R², 24 cases at untrained pressures (52.5 and 87.5 MPa) | 0.703 | 0.714 (OLS: 0.726) |
 
----
+![Predicted vs CalculiX correction factor on the 96 held-out cases](reports/figures/extended_benchmark_nuage_en.png)
 
-## Why Dome-Resolved FEA Is Needed
+I then plugged the corrected model into the optimizer and checked the designs it produced: 10 seeds gave 17 distinct layups, each rebuilt and re-run in CalculiX at the 87 MPa design burst pressure ([`data/ga_statistical_validation.csv`](data/ga_statistical_validation.csv)).
 
-Fast analytical preliminary-sizing codes rely on Classical Laminate Theory (CLT) applied to a thin-walled cylindrical membrane under internal pressure $p$:
+![Fibre index of the 17 GA designs: fast model, corrected model, CalculiX p95 and maximum](reports/figures/readme_ga_check.png)
 
-$$\sigma_{\theta} = \frac{p\,r}{t}, \qquad \sigma_{z} = \frac{p\,r}{2t}$$
+The raw fast model underestimated the CalculiX fibre index on all 17 designs, even against the 95th percentile. With the correction, the prediction is above the CalculiX p95 value on 17/17 designs, but above the pointwise maximum on only 4/17, and 5 of the 17 designs have a local CalculiX peak above 1. The correction removes the systematic optimism of the fast model; it does not cover the local peaks at the polar opening (see Limitations).
 
-While this calculation evaluates in under 1 ms—making it practical for genetic algorithm (GA) loops requiring tens of thousands of evaluations—it drastically simplifies precisely the regions where structural failure initiates:
-- **Domes and polar bosses:** complex meridional curvature variations and polar clearance constraints.
-- **Geodesic fiber trajectories:** continuous evolution of ply angle $\alpha(r)$ governed by Clairaut's relation ($\sin\alpha(r) = r_b / r$, with boss radius $r_b$).
-- **Thickness redistribution:** significant ply accumulation near the polar openings.
-- **Dome-to-cylinder transitions:** localized bending discontinuities and interlaminar shear stresses.
+## What I built
 
-![Distribution of critical failure zones across the historical 128-case DOE](reports/figures/calculix_critical_zones.png)
-*Figure 2: Distribution of critical failure zones identified across the historical 128-case finite-element campaign.*
+The optimizer and the fast model are not mine ([Credits](#credits)). Everything below is.
 
-This limitation is demonstrated by the historical 128-case Design of Experiments (DOE):
-- **Right dome:** 86 cases
-- **Left dome:** 22 cases
-- **Dome–cylinder junction:** 20 cases
-- **Cylinder:** 0 cases
+- **CalculiX vessel model**, [`code/high_fidelity/generate_calculix_composite_case.py`](code/high_fidelity/generate_calculix_composite_case.py): cylinder, dome (hemispherical, isotensoid-like or variable contour) and polar boss meshed as S8R quadratic shells. The winding angle follows Clairaut's geodesic law, sin α(r) = r_b / r, and the ply thickness builds up towards the pole. Each element gets its own `*SHELL SECTION, COMPOSITE` with local angles and thicknesses. One boss is fixed axially and the other slides, so the vessel can elongate under pressure without an artificial axial clamp. Post-processing ([`postprocess_calculix_case.py`](code/high_fidelity/postprocess_calculix_case.py)) reads the `.frd`, assigns each section point to a ply from its radial position, averages the stress per ply and per element, rotates it into the fibre frame and evaluates Hashin, Tsai-Wu, Puck and the fibre index |σ11|/X_T (X_C in compression).
+- **Two DOEs.** First an exploratory 128-case campaign over a wide range of vessel sizes. After feedback that the sizes varied too much, a second one at a fixed 11 L volume, [`code/config/generate_doe_11l.py`](code/config/generate_doe_11l.py): 384 cases varying the radius (76 to 96 mm), boss radius, dome shape, helical angle (12 to 26°), number of helical, transition and hoop pairs, and total thickness (10.5 to 26.1 mm). Every case was solved in CalculiX. Case roles (train, holdout, boundary, pressure scale) are fixed in [`data/doe_11l_single_boss_cases.json`](data/doe_11l_single_boss_cases.json).
+- **Choice of the target.** I first used the maximum of the combined criteria, as the fast model does. Near the polar opening the matrix and shear indices reach the hundreds at operating pressure, which made the ratio meaningless, so I switched to the fibre index: burst in Type IV vessels is fibre-driven, and C came back to between 1.0 and 4.5.
+- **Correctors**, [`code/calibration/extended_statistical_validation.py`](code/calibration/extended_statistical_validation.py): constant, OLS, Ridge and an MLP (24×12, tanh, Adam, L2 4e-4, 6000 epochs), all written in NumPy with manual backpropagation. Inputs: 17 design and fast-model quantities, 6 derived ratios (P·r/t, boss-to-radius ratio and others) and the one-hot dome shape. Target: log C. The dataset is assembled by [`build_fiber_proxy_dataset.py`](code/calibration/build_fiber_proxy_dataset.py).
+- **Optimizer coupling**, [`code/optimization/ga_correction.py`](code/optimization/ga_correction.py): the fitness uses FI_fast × Ĉ(x) × exp(m₉₅), where m₉₅ is the 95th percentile of the MLP's cross-validation residuals on log C. I changed three files of the optimizer to call it and left its mechanics untouched.
 
-108 out of 128 cases were controlled by a dome region, and none by the cylinder. This is why a cylindrical membrane model alone is insufficient.
+## How it works
 
----
+![Workflow: fast model, CalculiX DOE, correction model, GA, FE re-check, literature benchmarks](reports/figures/fig_workflow_en.png)
 
-## Scientific Workflow
+The fast model stays in the loop because the optimizer calls it tens of thousands of times. The correction only has to learn one scalar per design, C = FI_FE / FI_fast, which is far easier than learning the stress field and keeps the fast model's own trends. Learning log C rather than C stops the large ratios near the polar opening from dominating the loss.
 
-Running a full finite-element model inside every optimizer iteration is computationally prohibitive. Conversely, relying solely on an uncorrected membrane model yields non-conservative or suboptimal layups.
+## How I checked it
 
-The multi-fidelity workflow couples both approaches: the fast analytical model provides baseline evaluations, while an external statistical corrector trained on dome-resolved FE simulations restores fidelity without modifying the analytical code.
+- Baselines first. The MLP is compared with a constant, OLS and Ridge on the same splits ([table above](#results)). Its gain over Ridge is 0.066 in CV R², which is modest. It is clearly ahead only at the edge of the geometric domain, and on the pressure-extrapolation split OLS does slightly better.
+- Splits and leakage. 288 training cases for 4 repeats of 8-fold CV, and 96 cases never used for training: 48 in-distribution holdouts, 24 geometric-boundary cases and 24 at untrained pressures. No duplicate designs and no overlap between training and evaluation (checked in the script).
+- Reproducible numbers. Re-running `extended_statistical_validation.py` on the committed dataset reproduces every value in `extended_statistical_metrics.json` exactly (fixed seeds).
+- End-to-end check. The 17 GA designs above, re-meshed and re-solved in CalculiX.
+- Published burst tests, with the same shell model and fibre index:
+  - Agne et al. 2025, GFRP and CFRP vessels with the layup table reconstructed from the paper: predicted burst 4 to 14 % below the measured 29.4 and 27.0 MPa.
+  - Jin et al. 2022, vessels EX-A and EX-B with the thickness read from a figure of the paper: 10 % and 22 % below the measured 65.2 MPa at the finest mesh, using the p99 value.
+  - Hu et al. 2021, 70 MPa vessel: the critical zone is in the dome, as in the paper, but the absolute index is not calibrated.
+- Mesh study on EX-A and EX-B with 16, 24 and 32 elements per direction ([`data/jin2022_mesh_convergence.csv`](data/jin2022_mesh_convergence.csv)). The pointwise maximum does not converge; it goes up, then down. The p99 value increases steadily but still moves by 6 % (EX-A) and 14 % (EX-B) between the last two meshes.
 
-![Multi-fidelity scientific workflow connecting fast analytical sizing, CalculiX DOE, discrepancy learning, GA optimization, FE verification, and literature benchmarks](reports/figures/fig_workflow_en.png)
-*Figure 3: Multi-fidelity engineering workflow. The fast analytical Python model is preserved. CalculiX provides a 384-case dome-resolved reference database, an external statistical corrector learns the discrepancy, the GA optimizes candidate layups, and candidates are re-verified in FEA and cross-checked against published benchmarks.*
-
-1. **Fast analytical baseline:** Evaluates cylindrical membrane stresses and nominal laminate failure via CLT in $<1\text{ ms}$.
-2. **Dome-resolved FE reference:** 384 axisymmetric composite shell models solved in CalculiX CrunchiX.
-3. **Discrepancy learning:** An external statistical model learns the ratio between the FE reference and the analytical proxy.
-4. **Genetic algorithm optimization:** The GA searches the layup space using corrected stress evaluations supplemented with a confidence margin.
-5. **FE verification:** Optimal designs are re-meshed and re-analyzed in CalculiX to confirm conservatism.
-6. **Literature cross-check:** Order-of-magnitude consistency is checked against published burst benchmarks.
-
-The machine learning model acts strictly as an external discrepancy corrector, preserving the speed of the analytical solver while injecting the spatial fidelity of the FE reference.
-
----
-
-## Finite-Element Composite Model
-
-The high-fidelity reference is formulated as an axisymmetric composite shell model in CalculiX CrunchiX.
-
-![Cutaway view of the composite shell stack and dome geometry](reports/figures/composite_cal_001_layer_stack_cutaway.png)
-*Figure 4: Cutaway of the composite shell layup showing ply stack stratification and geometric progression from the cylindrical barrel into the dome.*
-
-### Shell Formulation and Winding Trajectory
-- **Elements:** Eight-node quadratic shell elements (`S8R`) with reduced integration.
-- **Laminate definition:** Element-by-element definition via `*SHELL SECTION, COMPOSITE`, assigning local thickness and ply orientation at each integration point.
-- **Winding law:** Geodesic progression satisfying Clairaut's equilibrium $\sin\alpha(r) = r_b / r$ with thickness buildup towards the polar boss.
-- **Constitutive behavior:** Linear orthotropic elasticity (`*ELASTIC, TYPE=ENGINEERING CONSTANTS`).
-
-### Sliding-Boss Kinematic Boundary Conditions
-The mechanical stress distribution in the dome is highly sensitive to boss boundary conditions:
-- The left boss is constrained axially ($U_3 = 0$).
-- The right boss is free to translate axially ($U_3$ free) to accommodate natural tank elongation.
-- Rigid-body translations are suppressed by transverse pin constraints.
-
-This configuration (`single_boss_reference`) satisfies the longitudinal force equilibrium under internal pressure:
-
-$$F_{\mathrm{axial}} = p\,\pi\,R_i^2 = \sigma_z\,A_{\mathrm{composite}}$$
-
-Locking both bosses axially introduces artificial compressive and shear stresses, whereas the sliding boss correctly reproduces the cylindrical membrane state away from the discontinuities.
-
-### Stress Transformation
-For each ply $k$ with fiber angle $\theta_k$, shell stresses in the global frame $\bm{\sigma}^{(k)}$ are mapped into the local material frame:
-
-$$\bm{\sigma}^{(k)}_{\ell} = \bm{T}_{\sigma}(\theta_k)\,\bm{\sigma}^{(k)}\,\bm{T}_{\sigma}^{T}(\theta_k)$$
-
-yielding the longitudinal fiber stress $\sigma_{11}^{(k)}$ used for failure assessment.
-
----
-
-## Failure Observable
-
-Early project iterations relied on a combined Tsai-Wu failure criterion (`max_combined`). In composite shells, matrix cracking and transverse shear reach failure thresholds at low operating pressures (10–20 MPa) and exhibit extreme numerical values (ratios reaching 100–600) near geometric singularities and boss junctions. Because vessel burst in Type IV tanks is governed by fiber tensile rupture, combined indices obscure the structural limit state.
-
-To provide a well-conditioned reference, the final calibration adopts a pure **fiber-stress failure proxy** ($\mathrm{FI}_{\mathrm{fiber}}$). For ply $j$:
-
-$$\mathrm{FI}_{\mathrm{fiber},j} = \begin{cases} \dfrac{\sigma_{11,j}}{X_T}, & \sigma_{11,j} \geq 0 \\[8pt] \dfrac{-\sigma_{11,j}}{X_C}, & \sigma_{11,j} < 0 \end{cases}$$
-
-The global tank observable is the maximum over all plies:
-
-$$\mathrm{FI}_{\mathrm{fiber}} = \max_j \mathrm{FI}_{\mathrm{fiber},j}$$
-
-Under this formulation, the correction ratio returns to a physically coherent scale ($1.0 \le C_i \le 1.8$).
-
-> [!IMPORTANT]  
-> The retained observable is an elastic fiber-dominated failure initiation proxy, not a full progressive-damage burst predictor.
-
----
-
-## Numerical Robustness: Mesh Sensitivity
-
-Computing the strict pointwise maximum stress at polar boss junctions introduces sensitivity to local geometric singularities (sharp corners, material stiffness mismatches between metal boss and composite).
-
-To examine mesh sensitivity, convergence was analyzed on the Paik EX-A benchmark (experimental burst pressure $65.20\text{ MPa}$) across three grid resolutions: $16\times16$, $24\times24$, and $32\times32$.
-
-![Mesh sensitivity analysis on the Paik EX-A benchmark comparing strict maximum stress and p99 spatial quantile](reports/figures/paik2023_mesh_convergence_en.png)
-*Figure 5: Mesh sensitivity on Paik EX-A. The strict maximum stress oscillates non-monotonically near polar singularities, whereas the p99 spatial quantile provides monotonic, stable behavior.*
-
-- **Strict maximum stress:** Exhibits non-monotonic oscillations due to localized corner singularities:
-  - $24\times24$: $48.28\text{ MPa}$
-  - $32\times32$: $43.38\text{ MPa}$
-- **p99 spatial quantile:** Provides monotonic progression and reduces mesh sensitivity:
-  - $16\times16$: $53.40\text{ MPa}$
-  - $24\times24$: $55.06\text{ MPa}$
-  - $32\times32$: $58.56\text{ MPa}$
-
-Spatial quantile filtering (p95 and p99) is therefore used to filter out localized numerical spikes. An additional refinement level would remain necessary for asymptotic grid independence, as the difference between $24\times24$ and $32\times32$ remains above 6%. Note that p99 acts as a numerical spatial filter and does not represent an empirical probability of structural survival.
-
----
-
-## Learning the Analytical-to-FE Discrepancy
-
-The statistical corrector models the discrepancy ratio between the CalculiX reference $\mathrm{FI}_i^{\mathrm{FE}}$ and the fast analytical output $\mathrm{FI}_i^{\mathrm{fast}}$:
-
-$$C_i = \frac{\mathrm{FI}_i^{\mathrm{FE}}}{\max(\mathrm{FI}_i^{\mathrm{fast}}, \epsilon)}$$
-
-Four models were trained on Dataset C (384 cases total: 288 train, 48 holdout, 48 out-of-distribution): a constant conservative baseline, Ordinary Least Squares (OLS), Ridge regression ($\alpha = 10.0$), and a Multi-Layer Perceptron (MLP with architecture 24×12 and $\tanh$ activation).
-
-![Predicted vs. reference correction factor on the evaluation set for OLS, Ridge, and MLP](reports/figures/extended_benchmark_nuage_en.png)
-*Figure 6: Predicted vs. reference correction factor on the 96-case evaluation set. The dashed diagonal denotes perfect agreement.*
-
-### Repeated 8-Fold Cross-Validation Performance
-
-| Model | RMSE | MAE | $R^2$ |
-|---|---:|---:|---:|
-| Constant baseline | $0.768 \pm 0.002$ | $0.693 \pm 0.004$ | $-3.910 \pm 0.207$ |
-| OLS | $0.157 \pm 0.017$ | $0.129 \pm 0.013$ | $0.791 \pm 0.047$ |
-| Ridge ($\alpha = 10.0$) | $0.155 \pm 0.016$ | $0.127 \pm 0.013$ | $0.796 \pm 0.046$ |
-| **MLP (24×12, $\tanh$)** | **$0.128 \pm 0.014$** | **$0.102 \pm 0.011$** | **$0.862 \pm 0.029$** |
-
-The MLP improves cross-validation $R^2$ by 0.066 over Ridge. This gain is real, but modest when considering the trade-off with the transparency and interpretability of linear formulations.
-
----
-
-## Extrapolation Results
-
-Model robustness was tested across four held-out subsets, distinguishing geometric domain boundary shifts from pressure scale variations:
-
-| Model | Eval ($n=96$) | Holdout, in-distribution ($n=48$) | Boundary extrapolation ($n=24$) | Pressure extrapolation ($n=24$) |
-|---|---:|---:|---:|---:|
-| Constant | $-4.01$ | $-5.90$ | $-2.27$ | $-4.02$ |
-| OLS | $0.717$ | $0.770$ | $0.647$ | $0.726$ |
-| Ridge | $0.727$ | $0.787$ | $0.672$ | $0.703$ |
-| **MLP** | **$0.778$** | **$0.789$** | **$0.800$** | **$0.714$** |
-
-The MLP demonstrates superior generalization on boundary extrapolation ($R^2 = 0.800$ vs. $0.672$ for Ridge), capturing nonlinear geometric edge effects. Conversely, on pressure extrapolation, OLS performs slightly better than the MLP ($R^2 = 0.726$ vs. $0.714$), as pressure scaling remains largely linear. The MLP should not be characterized as uniformly superior across all out-of-distribution regimes.
-
----
-
-## Data Leakage Audit
-
-A dataset verification confirms the integrity of the evaluation splits:
-- **0 duplicate rows** across the entire 384-case dataset.
-- **0 train/eval intersection** between the 288 training cases, 96 evaluation cases, 48 in-distribution holdout cases, 24 boundary extrapolation cases, and 24 pressure extrapolation cases.
-
----
-
-## End-to-End Optimization Check
-
-The calibrated MLP corrector was coupled to the genetic algorithm optimizer with an added p95 residual margin to penalize non-conservative under-predictions:
-
-- Optimization runs were executed across **10 distinct random seeds**.
-- A total of **17 unique candidate designs** were generated.
-- Full CalculiX FE models were automatically constructed and solved for all 17 candidates.
-
-All 17 candidates remained conservative relative to the retained CalculiX fiber observable. This verifies the numerical consistency of the coupled pipeline within the investigated search space. However, it does not represent physical burst certification.
-
----
-
-## What This Project Demonstrates
-
-This project demonstrates a complete, multidisciplinary engineering workflow:
-$$\text{Fast Mechanics (CLT)} \longrightarrow \text{Dome-Resolved FEA} \longrightarrow \text{Discrepancy Learning} \longrightarrow \text{GA Optimization} \longrightarrow \text{FE Verification}$$
-
-Rather than attempting to replace mechanics with black-box regression, the methodology uses physics-based simulation to identify where analytical assumptions fail, applies statistical correction to bridge the discrepancy, and closes the loop through numerical verification.
-
----
+![Mesh study on the Jin et al. 2022 vessels](reports/figures/paik2023_mesh_convergence_en.png)
 
 ## Limitations
 
-- **Linear elastic formulation:** The CalculiX model does not account for thermoplastic liner plasticity or progressive composite damage (delamination, matrix micro-cracking).
-- **No physical burst testing:** Results are verified against numerical simulations and cross-checked against literature orders of magnitude; physical hydrostatic burst testing is required for industrial deployment.
-- **Single geometry family:** Calibrated specifically for single-boss, 11-layer vessels under geodesic winding paths.
-- **Fiber-dominated observable:** The target proxy focuses on fiber failure and does not capture matrix-dominated degradation mechanisms.
-- **Local mesh sensitivity:** Pointwise maximum stresses remain sensitive to polar corner singularities.
-- **External GA codebase:** The collaborative genetic algorithm framework is external to this repository; `code/optimization/ga_correction.py` is provided as an interface reference.
-
----
+- Linear elastic shells: no progressive damage, no liner plasticity, no liner/boss contact in the DOE. I tested contact separately on two cases of the first DOE. Changing the penalty stiffness moved the stresses by about 0.3 %, but going from tied to penalty contact moved them by 7.5 to 8 %, and frictional contact never ran reliably, so contact stayed out of the DOE.
+- The local peak at the polar opening is mesh-dependent, which is why the GA check passes against p95 but not against the maximum. A finer local mesh or a solid model of the boss region would be the next step.
+- The peak lands in the dome on the fixed-boss side in 198 of 384 cases and never on the sliding side, so part of the dome effect comes from the boss boundary condition.
+- One vessel family: 11 L, single boss, geodesic winding, carbon/epoxy. The correction should not be used outside the sampled ranges.
+- No physical test of my own. The burst comparisons rely on published data, with some geometry read from figures.
+- The optimizer code is not in this repository, so the GA check cannot be re-run from here.
 
 ## Reproduce
 
-### Requirements
 ```bash
 pip install numpy pandas matplotlib
+python code/calibration/extended_statistical_validation.py   # about 2 min; rewrites data/extended_statistical_metrics.json and the two benchmark figures
+python code/plotting/make_readme_figures.py                  # top figure and GA check figure
 ```
 
-### Statistical Validation Script
-The dataset (`data/fiber_proxy_dataset.csv`) and computed metrics (`data/extended_statistical_metrics.json`) are committed.
+Re-running the CalculiX cases needs CalculiX 2.23 (`ccx`) and produces about 20 MB per case; those raw `.frd` files are not in the repository. [`code/plotting/render_fiber_field.py`](code/plotting/render_fiber_field.py) renders the field on the left of the top figure from such a file with ParaView 6.1 (`pvpython`). The paths to `ccx` and to FreeCAD's Python are hard-coded for Windows in `code/high_fidelity/run_calculix_*.py`.
 
-```bash
-python code/calibration/extended_statistical_validation.py
-```
+The full write-up, with equations and benchmark details, is in [`reports/english/rapport_public_en.pdf`](reports/english/rapport_public_en.pdf) (French version in `reports/french/`).
 
-> [!NOTE]  
-> The script `code/calibration/extended_statistical_validation.py` imports an internal helper module (`calibration_utils.py`) that resolves local dataset paths and is not yet committed to this repository. Consequently, the script will not run standalone until that utility is published. The benchmark metrics and figure outputs are fully committed.
+## Credits
 
----
+- Genetic-algorithm optimizer and fast analytical model (`computation.py`, `tank.py`, `individual.py`, `population.py`, `crossover.py`, `mutation.py`): collaborative student codebase from 2025, not included here.
+- Solver: [CalculiX](http://www.calculix.de/) 2.23. Rendering: ParaView.
+- Published tests used for comparison: Hu, Chen & Pan, *Int. J. Hydrogen Energy* (2021); Agne et al., *Composite Structures* (2025); Jin, Cheng, Bai, Paik & Li, *Ships and Offshore Structures* (2022). Full references in [`reports/references_public.bib`](reports/references_public.bib).
 
-## Full Technical Report
-
-The complete 8-page paper detailing equations, boundary conditions, mesh convergence, and benchmark reconstructions is available in the repository:
-
-- **Compiled PDF:** [`reports/english/rapport_public_en.pdf`](reports/english/rapport_public_en.pdf)
-- **LaTeX Source:** [`reports/english/main_public_en.tex`](reports/english/main_public_en.tex)
-- **BibTeX Bibliography:** [`reports/references_public.bib`](reports/references_public.bib)
-
----
-
-## References
-
-1. **Hu, Chen & Pan (2021).** Simulation and burst validation of 70 MPa Type IV hydrogen storage vessel with dome reinforcement. *International Journal of Hydrogen Energy*.
-2. **Agne et al. (2025).** Progressive failure modelling of Type IV composite overwrapped pressure vessels for compressed natural gas storage. *Composite Structures*.
-3. **Jin, Cheng, Bai & Paik (2022).** Progressive failure analysis and burst mode study of Type IV composite vessels. *Ships and Offshore Structures*.
-
-Complete citations are available in [`reports/references_public.bib`](reports/references_public.bib).
-
+Clément Dumeril · [clement.dumeril.net](https://clement.dumeril.net) · [github.com/clementdumeril](https://github.com/clementdumeril)

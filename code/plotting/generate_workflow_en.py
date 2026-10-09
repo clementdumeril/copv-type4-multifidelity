@@ -1,3 +1,4 @@
+from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
@@ -27,7 +28,7 @@ def generate_chart():
     # 1. Row 1: Pipeline de Données
     draw_box(0.5, 4.6, 2.5, 1.2, 
              "1. Fast Python Analytical Model", 
-             "Classical Laminate Theory (CLT)\nFast execution (<1 ms)\nCylinder section only",
+             "Thick multilayer cylinder (Lekhnitskii)\nFast execution (<1 ms)\nCylinder section only",
              color='#eef4f8', edgecolor='#3182bd')
              
     draw_box(4.0, 4.6, 2.7, 1.2, 
@@ -37,13 +38,13 @@ def generate_chart():
              
     draw_box(7.7, 4.6, 2.5, 1.2, 
              "3. Physical Observable", 
-             "Fibre stress ratio proxy\nLongitudinal fibre index (FI)\nRealistic range (1.0 to 1.8)",
+             "Fibre index |s11|/X, worst ply\nC = FI_CalculiX / FI_fast\nC between 1.0 and 4.5 on the DOE",
              color='#fef9e7', edgecolor='#f39c12')
 
     # 2. Row 2: Correction & Optimisation
     draw_box(7.7, 2.4, 2.5, 1.2, 
              "4. Multi-Fidelity MLP Corrector", 
-             "Multilayer Perceptron (24x12)\nTanh activation\nCorrects local membrane errors\nSecured by p95 residual margin",
+             "Multilayer Perceptron (24x12)\nTanh activation\nPredicts C from design inputs\nSecured by p95 residual margin",
              color='#fbf2f2', edgecolor='#e74c3c')
              
     draw_box(4.0, 2.4, 2.7, 1.2, 
@@ -59,7 +60,7 @@ def generate_chart():
     # 3. Validation / Étude de fond (bottom)
     draw_box(2.0, 0.4, 6.7, 1.2, 
              "7. Experimental & Physical Benchmarks (Relative Validation)", 
-             "Order-of-magnitude quantitative comparison with published data:\n- Paik EX-A (65.2 MPa, p99 proxy fibre) | - Hu 2021 (70 MPa, first fibre damage)\n- Agne 2025 (GFRP / CFRP, exact reconstruction of layup table)",
+             "Order-of-magnitude quantitative comparison with published data:\n- Jin 2022 EX-A (65.2 MPa, p99 fibre proxy) | - Hu 2021 (70 MPa, first fibre damage)\n- Agne 2025 (GFRP / CFRP, exact reconstruction of layup table)",
              color='#fdfefe', edgecolor='#2c3e50', title_color='#2c3e50')
 
     # Helper function for arrows
@@ -82,7 +83,7 @@ def generate_chart():
     draw_arrow(5.35, 2.3, 5.35, 1.7) # 5 -> 7 (Validation of GA candidates)
 
     plt.tight_layout()
-    plt.savefig('livrables/figures/fig_workflow_en.png', dpi=300, bbox_inches='tight')
+    plt.savefig(str(Path(__file__).resolve().parents[2] / 'reports' / 'figures' / 'fig_workflow_en.png'), dpi=300, bbox_inches='tight')
     plt.close()
     print("Workflow English figure generated successfully.")
 
