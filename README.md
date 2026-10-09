@@ -5,7 +5,7 @@ A Type IV hydrogen tank optimizer used a fast analytical model that only sees th
 ![CalculiX fiber failure index on one 11 L vessel, and where the peak falls across the 384 cases](reports/figures/readme_hero.png)
 *Left: fiber index |σ11|/X (worst ply per element) for case `11l_0122` at 70 MPa, rendered from the CalculiX result. The peak sits at the polar opening of the dome on the axially fixed boss, in a hoop ply (see Limitations). Right: critical zone over the 384 cases. The fast model always reports the cylinder.*
 
-Arts et Métiers student project, May to June 2026; the written report was submitted by a group of four, and the modelling, code and analysis in this repository are mine. The starting point was a 2025 genetic-algorithm layup optimizer whose mechanics are a thick multilayer cylinder (Lekhnitskii) with Hashin, Tsai-Wu and Puck criteria, evaluated in under a millisecond. It models neither the dome nor the boss, and burst often starts in the dome. The question was how to make the optimizer account for the dome without slowing it down or changing its code.
+Started as an Arts et Métiers group assignment (May to June 2026); I did all of the modelling, code and analysis myself. The starting point was a 2025 genetic-algorithm layup optimizer whose mechanics are a thick multilayer cylinder (Lekhnitskii) with Hashin, Tsai-Wu and Puck criteria, evaluated in under a millisecond. It models neither the dome nor the boss, and burst often starts in the dome. The question was how to make the optimizer account for the dome without slowing it down or changing its code.
 
 Skills: CalculiX (S8R composite shells), NumPy MLP with hand-written backprop/Adam, DOE, repeated k-fold CV, ParaView.
 
@@ -83,7 +83,6 @@ Re-running CalculiX cases needs CalculiX 2.23 (set `CCX` and `FREECAD_PYTHON` if
 
 ## Credits
 
-- Co-authors of the school report: Ilan Bruski, Elouan Bruneau, William Bueluot.
 - Genetic-algorithm optimizer and fast analytical model: an existing 2025 codebase, not written by me and not included here.
 - [CalculiX](http://www.calculix.de/) 2.23 and ParaView.
 - Published tests: Hu, Chen & Pan, *Int. J. Hydrogen Energy* (2021); Agne et al., *Composite Structures* (2025); Jin, Cheng, Bai, Paik & Li, *Ships and Offshore Structures* (2022); Lueders, Ropte, Schmidt & Liebisch, *Data in Brief* (2025). See [`reports/references_public.bib`](reports/references_public.bib).
