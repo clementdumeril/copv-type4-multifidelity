@@ -51,7 +51,8 @@ The fast model stays in the loop because the optimizer calls it tens of thousand
 - Published burst tests, with the same shell model and fibre index:
   - Agne et al. 2025, GFRP and CFRP vessels with the layup table reconstructed from the paper: predicted burst 4 to 14 % below the measured 29.4 and 27.0 MPa.
   - Jin et al. 2022, vessels EX-A and EX-B with the thickness read from a figure of the paper: 10 % and 22 % below the measured 65.2 MPa at the finest mesh, using the p99 value.
-  - Hu et al. 2021, 70 MPa vessel: the critical zone is in the dome, as in the paper, but the absolute index is not calibrated.
+  - Hu et al. 2021, 70 MPa vessel: the fibre index reaches 1 in the dome at 148.7 MPa, against a first fibre damage reported at 161 MPa (-7.6 %).
+  - Lueders et al. 2025 (DLR open burst-test data, vessel SN03): this one fails. With the layup book published with the data, the model predicts fibre failure at 6.5 MPa against a measured burst at 25.4 MPa (-74 %); the 22.2° helical layer becomes critical near its turnaround radius. My dome contour is a spherical-cap approximation rather than the measured liner contour, and the coverage law near the turnaround is the other suspect. I have not resolved it.
 - Mesh study on EX-A and EX-B with 16, 24 and 32 elements per direction ([`data/jin2022_mesh_convergence.csv`](data/jin2022_mesh_convergence.csv)). The pointwise maximum does not converge; it goes up, then down. The p99 value increases steadily but still moves by 6 % (EX-A) and 14 % (EX-B) between the last two meshes.
 
 ![Mesh study on the Jin et al. 2022 vessels](reports/figures/paik2023_mesh_convergence_en.png)
@@ -62,7 +63,7 @@ The fast model stays in the loop because the optimizer calls it tens of thousand
 - The local peak at the polar opening is mesh-dependent, which is why the GA check passes against p95 but not against the maximum. A finer local mesh or a solid model of the boss region would be the next step.
 - The peak lands in the dome on the fixed-boss side in 198 of 384 cases and never on the sliding side, so part of the dome effect comes from the boss boundary condition.
 - One vessel family: 11 L, single boss, geodesic winding, carbon/epoxy. The correction should not be used outside the sampled ranges.
-- No physical test of my own. The burst comparisons rely on published data, with some geometry read from figures.
+- No physical test of my own. The burst comparisons rely on published data, with some geometry read from figures, and the DLR 2025 test is not reproduced (see above), so the absolute fibre index should not be read as a burst prediction.
 - The optimizer code is not in this repository, so the GA check cannot be re-run from here.
 
 ## Reproduce
@@ -81,6 +82,6 @@ The full write-up, with equations and benchmark details, is in [`reports/english
 
 - Genetic-algorithm optimizer and fast analytical model (`computation.py`, `tank.py`, `individual.py`, `population.py`, `crossover.py`, `mutation.py`): collaborative student codebase from 2025, not included here.
 - Solver: [CalculiX](http://www.calculix.de/) 2.23. Rendering: ParaView.
-- Published tests used for comparison: Hu, Chen & Pan, *Int. J. Hydrogen Energy* (2021); Agne et al., *Composite Structures* (2025); Jin, Cheng, Bai, Paik & Li, *Ships and Offshore Structures* (2022). Full references in [`reports/references_public.bib`](reports/references_public.bib).
+- Published tests used for comparison: Hu, Chen & Pan, *Int. J. Hydrogen Energy* (2021); Agne et al., *Composite Structures* (2025); Jin, Cheng, Bai, Paik & Li, *Ships and Offshore Structures* (2022); Lueders, Ropte, Schmidt & Liebisch, *Data in Brief* (2025). Full references in [`reports/references_public.bib`](reports/references_public.bib).
 
 Clément Dumeril · [clement.dumeril.net](https://clement.dumeril.net) · [github.com/clementdumeril](https://github.com/clementdumeril)
