@@ -48,13 +48,13 @@ The optimizer maximizes the inner-to-outer radius ratio (thinnest wall) and keep
 
 ## How I checked it
 
-The MLP was compared with a constant, OLS and Ridge on the same splits. It beats Ridge by 0.066 in CV R², which is modest, and only clearly at the edge of the geometric domain. The 96 evaluation cases were never used in training, and re-running the script reproduces the metrics file exactly.
+The MLP was compared with a constant, OLS and Ridge on the same splits. It beats Ridge by 0.066 in CV R², which is modest, and only clearly at the edge of the geometric domain. At untrained pressures OLS is slightly better (0.726). The 96 evaluation cases were never used in training, and re-running the script reproduces the metrics file exactly.
 
 The CalculiX model itself was compared with four published burst tests:
 
 | Test | Gap |
 |---|---|
-| Hu 2021 (first fiber damage) | 8 % below |
+| Hu 2021 (first fiber damage) | 8 % below, but in the cylinder rather than the dome |
 | Agne 2025 | 4 to 14 % below |
 | Jin 2022 | 10 to 22 % below |
 | DLR 2025 (Lueders et al.) | 74 % below, not reproduced |

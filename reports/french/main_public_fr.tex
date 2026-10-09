@@ -37,7 +37,7 @@
 \begin{@twocolumnfalse}
 \maketitle
 \begin{abstract}
-Les modèles analytiques rapides sont indispensables lors de la phase préliminaire de conception des réservoirs sous pression composites de type IV (COPV), mais ils souffrent d'imprécisions intrinsèques dans les régions du dôme, de la jonction dôme--cylindre et de l'embase. C'est dans ces zones que la courbure, la redistribution des fibres et les effets de bord pilotent la rupture locale. Ce rapport documente une méthodologie multi-fidélité visant à calibrer un correcteur externe sur le modèle Python rapide, sans modifier son code source, à l'aide d'une référence éléments finis résolue au dôme sous CalculiX. Les conditions aux limites de pivot glissant permettent l’allongement axial du réservoir tout en supprimant les mouvements de corps rigide. L'analyse statistique s'appuie sur une campagne systématique de 384 cas résolus par éléments finis (Dataset C). Elle montre que l'écart géométrique et cinématique entre le calcul rapide et la référence CalculiX peut être corrigé par un perceptron multicouche (MLP), qui ramène l'erreur absolue moyenne (MAE) à \num{0.102} (validation croisée $R^2 = \num{0.862}$). Face aux essais publiés, le proxy fibre CalculiX se situe 8 à 12 \% sous les pressions rapportées pour les réservoirs de Hu 2021 et Agne 2025, mais 10 à 22 \% sous celles de Jin 2022 et 74 \% sous l'éclatement de l'essai DLR 2025, ce qui désigne le modèle de dôme comme la principale limite. Le flux de travail est donc un outil de pré-dimensionnement numérique dans le domaine étudié, pas un prédicteur d'éclatement.
+Les modèles analytiques rapides sont indispensables lors de la phase préliminaire de conception des réservoirs sous pression composites de type IV (COPV), mais ils souffrent d'imprécisions intrinsèques dans les régions du dôme, de la jonction dôme--cylindre et de l'embase. C'est dans ces zones que la courbure, la redistribution des fibres et les effets de bord pilotent la rupture locale. Ce rapport documente une méthodologie multi-fidélité visant à calibrer un correcteur externe sur le modèle Python rapide, sans modifier son code source, à l'aide d'une référence éléments finis résolue au dôme sous CalculiX. Les conditions aux limites de pivot glissant permettent l’allongement axial du réservoir tout en supprimant les mouvements de corps rigide. L'analyse statistique s'appuie sur une campagne systématique de 384 cas résolus par éléments finis (Dataset C). Elle montre que l'écart géométrique et cinématique entre le calcul rapide et la référence CalculiX peut être corrigé par un perceptron multicouche (MLP), qui ramène l'erreur absolue moyenne (MAE) à \num{0.102} (validation croisée $R^2 = \num{0.862}$). Face aux essais publiés, le proxy fibre CalculiX se situe 4 à 14 \% sous les pressions rapportées pour les réservoirs de Hu 2021 et Agne 2025, mais 10 à 22 \% sous celles de Jin 2022 et 74 \% sous l'éclatement de l'essai DLR 2025, ce qui désigne le modèle de dôme comme la principale limite. Le flux de travail est donc un outil de pré-dimensionnement numérique dans le domaine étudié, pas un prédicteur d'éclatement.
 \end{abstract}
 \keywords{réservoir Type IV; enveloppe composite; CalculiX; modélisation de dôme; correction multi-fidélité; perceptron multicouche; enroulement filamentaire; pré-dimensionnement}
 \vspace{1.0em}
@@ -54,12 +54,12 @@ Le stockage de l'hydrogène à haute pression (typiquement 35 à 70 MPa) pour le
 
 L'objectif de cette étude est de construire une couche de correction externe multi-fidélité pour le modèle rapide. Pour préserver les performances de calcul du GA, le code source Python rapide n'est pas modifié. On cherche plutôt à calibrer un interpolateur statistique (correcteur) qui ré-évalue les contraintes sur la base d'une référence éléments finis bidimensionnelle (2.5D) par coques développée sous le code open-source CalculiX. 
 
-Le flux de travail global est présenté à la Figure~\ref{fig:workflow}. La correction est entraînée sur un plan d'expériences (DOE) de 384 cas physiques résolus et validée par rapport à des données expérimentales de la littérature pour évaluer sa pertinence mécanique.
+Le flux de travail global est présenté à la Figure~\ref{fig:workflow}. La correction est entraînée sur un plan d'expériences (DOE) de 384 cas physiques résolus et le modèle CalculiX est comparé à des essais d'éclatement publiés pour évaluer sa pertinence mécanique.
 
 \begin{figure*}[t]
   \centering
   \includegraphics[width=0.92\textwidth]{fig_workflow.png}
-  \caption{Flux de travail scientifique multi-fidélité. Le modèle Python rapide est conservé. CalculiX génère une base de données de référence de 384 cas résolus au dôme, l'écart est appris en externe par apprentissage statistique, et des benchmarks expérimentaux de la littérature valident la pertinence relative avant le déploiement sur l'algorithme génétique.}
+  \caption{Flux de travail scientifique multi-fidélité. Le modèle Python rapide est conservé. CalculiX génère une base de données de référence de 384 cas résolus au dôme, l'écart est appris en externe par apprentissage statistique, et des essais d'éclatement publiés servent de comparaison externe avant le déploiement sur l'algorithme génétique.}
   \label{fig:workflow}
 \end{figure*}
 
@@ -220,7 +220,7 @@ Le MLP obtient la meilleure performance moyenne en validation croisée et améli
 La boucle d'optimisation par algorithme génétique (GA) a été exécutée sous une contrainte de contrainte fibre sécurisée par la prédiction MLP et sa règle de marge \texttt{p95} (quantile 95 \% des résidus). Sur 10 graines aléatoires, 17 candidats uniques optimisés ont été obtenus. L'analyse par éléments finis sous CalculiX de ces 17 candidats à la pression de conception de \SI{87}{MPa} montre que la prédiction corrigée est conservative par rapport au 95\textsuperscript{e} centile de l'indice fibre CalculiX pour les 17 candidats, mais par rapport à son maximum ponctuel pour 4 d'entre eux seulement ; 5 candidats présentent un maximum local CalculiX supérieur à 1. Le modèle rapide non corrigé est non conservatif pour les 17 candidats, même par rapport au p95. Ce résultat constitue une vérification bout-en-bout encourageante dans le domaine d’optimisation testé, mais ne représente pas une garantie de sécurité physique hors de ce domaine.
 
 \subsection{Reconstruction du benchmark Hu 2021}
-Le réservoir Type IV de 70 MPa sans renforcement de dôme de \citet{Hu2021} a été modélisé. Bien que l'indice combiné global CalculiX n'est pas directement comparable à l'éclatement expérimental, l'observable fibre pur localisé au dôme donne un premier pli rompu à une pression calculée de \SI{148.7}{MPa}. Cette valeur se situe dans la même échelle que la pression expérimentale de premier endommagement fibre rapportée par les auteurs (\SI{161}{MPa}, erreur relative de -7,6 \%).
+Le réservoir Type IV de 70 MPa sans renforcement de dôme de \citet{Hu2021} a été modélisé. Bien que l'indice combiné global CalculiX n'est pas directement comparable à l'éclatement expérimental, l'observable fibre pur donne un premier pli rompu à une pression calculée de \SI{148.7}{MPa}. Cette valeur se situe dans la même échelle que la pression expérimentale de premier endommagement fibre rapportée par les auteurs (\SI{161}{MPa}, erreur relative de -7,6 \%). La localisation ne concorde pas en revanche : dans le modèle, le premier pli rompu est un pli circonférentiel de la virole, alors que les auteurs indiquent la région du dôme.
 
 \subsection{Reconstruction du benchmark Agne 2025}
 Le benchmark de \citet{Agne2025} (réservoirs GNC de type IV en fibre de verre GFRP et fibre de carbone CFRP) a été reconstruit à partir des données exactes de stratification publiées. En raison de l'ambiguïté des notations d'enroulement, la convention des plis signés totaux et celle des paires plus/moins ont été testées. La Figure~\ref{fig:agne-conventions} montre l'effet de ces conventions sur l'épaisseur du composite.
@@ -232,7 +232,7 @@ Le benchmark de \citet{Agne2025} (réservoirs GNC de type IV en fibre de verre G
   \label{fig:agne-conventions}
 \end{figure}
 
-Les résultats numériques à la résolution 16x16 sont résumés dans la section des annexes techniques pour préserver la structure principale. Sous la convention des plis signés totaux, l'erreur relative par rapport à la pression d'éclatement expérimentale est de -11,5 \% pour le GFRP et de -10,5 \% pour le CFRP. Le modèle par coque se situe donc dans le même ordre de grandeur physique pour les observables de rupture de fibre, avec une tendance conservative appropriée pour le pré-dimensionnement.
+Avec l'indice fibre utilisé dans tout ce rapport (maximum, p95 et p99 sur le réservoir), la pression d'éclatement prédite est de 5,9 à 13,6 \% inférieure à l'essai pour le GFRP et de 4,3 à 4,9 \% pour le CFRP, soit 4 à 14 \%. Un calcul 16x16 antérieur en convention des plis signés totaux, conservé en annexe (Tableau~\ref{tab:agne16-results}), donnait -11,5 \% et -10,5 \%, dans la même plage. Le modèle par coque se situe donc dans le même ordre de grandeur physique pour les observables de rupture de fibre, avec une tendance conservative appropriée pour le pré-dimensionnement.
 
 \subsection{Synthèse et nature des grandeurs comparées}
 \subsection{Résultat négatif : essai d'éclatement DLR 2025}
@@ -274,13 +274,15 @@ Cette étude démontre la viabilité de la correction externe multi-fidélité p
 
 \section{Disponibilité du code et des données}
 
-La reproductibilité est assurée par une structure de dépôt documentée :
+Tous les fichiers ci-dessous sont dans le dépôt public \url{https://github.com/clementdumeril/copv-type4-multifidelity} :
 \begin{itemize}
-    \item \url{livrables/main_public_fr.tex} : Source du rapport technique.
-    \item \url{livrables/references_public.bib} : Base bibliographique résolue.
-    \item \url{type4_calibration/calibration/extended_statistical_validation.py} : Script de validation statistique.
-    \item \url{type4_calibration/outputs_11l_single_boss/comparison_tables/extended_statistical_metrics.json} : JSON des métriques d'apprentissage.
-    \item \url{livrables/README_REPRODUCTION.md} : Instructions pas à pas pour la reproduction de l'étude.
+    \item \url{README.md} : présentation et commandes de reproduction.
+    \item \url{code/high_fidelity/} : générateur de cas CalculiX et post-traitement.
+    \item \url{code/config/generate_doe_11l.py} : générateur du DOE de 384 cas.
+    \item \url{code/calibration/extended_statistical_validation.py} : validation statistique ; réécrit \url{data/extended_statistical_metrics.json}.
+    \item \url{data/fiber_proxy_dataset.csv} et \url{data/doe_11l_single_boss_cases.json} : jeu de données et rôles des cas.
+    \item \url{docs/VALIDATION.md} : détails des benchmarks, du maillage et du contact.
+    \item \url{reports/french/main_public_fr.tex} et \url{reports/references_public.bib} : source de ce rapport.
 \end{itemize}
 
 \section*{Remerciements}

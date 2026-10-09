@@ -64,7 +64,7 @@ The comparisons use the same shell model and the same fiber index as the DOE. Ge
 | Lueders et al. 2025 (DLR) | SN03, simplified layup | 25.37 MPa | 11.8 MPa | −53 % |
 | Lueders et al. 2025 (DLR) | SN03, published layup book | 25.37 MPa | 6.5 MPa | −74 % |
 
-The ranges for Agne span the maximum, p95 and p99 of the fiber index. The DLR test is not reproduced. With the exact layup, the 22.2° helical layer becomes critical near its turnaround radius. The likely causes are:
+The ranges for Agne span the maximum, p95 and p99 of the fiber index. For Hu, the pressure is close, but in the model the first failed ply is a hoop ply in the cylinder, while the paper reports the dome region. The DLR test is not reproduced. With the exact layup, the 22.2° helical layer becomes critical near its turnaround radius. The likely causes are:
 
 - the dome contour, which is a spherical-cap approximation instead of the measured liner contour;
 - the coverage law near the turnaround;
