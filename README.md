@@ -1,6 +1,6 @@
 # Correcting a fast pressure-vessel sizing model with 384 CalculiX simulations
 
-A Type IV hydrogen tank optimizer used a fast analytical model that only sees the cylinder. I built a CalculiX composite-shell model of the whole vessel, ran 384 cases, and trained a small MLP that corrects the fast model's fiber failure index (cross-validated R² 0.862 on log C, against 0.796 for Ridge).
+A Type IV hydrogen tank optimizer used a fast analytical model that only sees the cylinder. I built a CalculiX composite-shell model of the whole vessel, 384 cases were solved with it, and I trained a small MLP that corrects the fast model's fiber failure index (cross-validated R² 0.862 on log C, against 0.796 for Ridge).
 
 ![CalculiX fiber failure index on one 11 L vessel, and where the peak falls across the 384 cases](reports/figures/readme_hero.png)
 *Left: fiber index |σ11|/X (worst ply per element) for case `11l_0122` at 70 MPa, rendered from the CalculiX result. The peak sits at the polar opening of the dome on the axially fixed boss. Right: critical zone over the 384 cases. The fast model always reports the cylinder.*
