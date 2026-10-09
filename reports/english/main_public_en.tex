@@ -37,7 +37,7 @@
 \begin{@twocolumnfalse}
 \maketitle
 \begin{abstract}
-Fast analytical models are indispensable during the preliminary design phase of composite type IV pressure vessels (COPVs), but they suffer from intrinsic inaccuracies in the dome, dome--cylinder junction, and boss regions. In these areas, local curvature, fiber redistribution, and edge effects govern local failure. This report documents a multi-fidelity methodology aimed at calibrating an external corrector on the fast Python model, without modifying its source code, using a dome-resolved finite element reference in CalculiX. The sliding boss boundary conditions allow the axial elongation of the tank while suppressing rigid-body motions. The statistical analysis is based on a systematic campaign of 384 finite element cases (Dataset C). It shows that the geometric and kinematic discrepancy between the fast calculation and the CalculiX reference can be corrected by a multilayer perceptron (MLP), reducing the mean absolute error (MAE) to \num{0.102} (cross-validation $R^2 = \num{0.862}$). Against published tests, the CalculiX fiber proxy lies 8 to 12\% below the reported pressures for the Hu 2021 and Agne 2025 vessels, but 10 to 22\% below for the Jin 2022 vessels and 74\% below for the DLR 2025 burst test, which identifies the dome model as the main limitation. The workflow is therefore a numerical preliminary-design tool within the investigated domain, not a burst predictor.
+Fast analytical models are indispensable during the preliminary design phase of composite type IV pressure vessels (COPVs), but they suffer from intrinsic inaccuracies in the dome, dome--cylinder junction, and boss regions. In these areas, local curvature, fiber redistribution, and edge effects govern local failure. This report documents a multi-fidelity methodology aimed at calibrating an external corrector on the fast Python model, without modifying its source code, using a dome-resolved finite element reference in CalculiX. The sliding boss boundary conditions allow the axial elongation of the tank while suppressing rigid-body motions. The statistical analysis is based on a systematic campaign of 384 finite element cases (Dataset C). It shows that the geometric and kinematic discrepancy between the fast calculation and the CalculiX reference can be corrected by a multilayer perceptron (MLP), reducing the mean absolute error (MAE) to \num{0.102} (cross-validation $R^2 = \num{0.862}$). Against published tests, the CalculiX fiber proxy lies 4 to 14\% below the reported pressures for the Hu 2021 and Agne 2025 vessels, but 10 to 22\% below for the Jin 2022 vessels and 74\% below for the DLR 2025 burst test, which identifies the dome model as the main limitation. The workflow is therefore a numerical preliminary-design tool within the investigated domain, not a burst predictor.
 \end{abstract}
 \keywords{Type IV vessel; composite shell; CalculiX; dome modeling; multi-fidelity correction; multilayer perceptron; filament winding; pre-design}
 \vspace{1.0em}
@@ -54,7 +54,7 @@ To this end, fast analytical or semi-analytical codes (netting analysis, membran
 
 The objective of this study is to construct a multi-fidelity external correction layer for the fast model. To preserve the computational performance of the GA, the fast Python source code is not modified. Instead, we seek to calibrate a statistical interpolator (corrector) that re-evaluates stresses based on a two-dimensional (2.5D) shell finite element reference developed using the open-source finite element solver CalculiX.
 
-The global workflow is presented in Figure~\ref{fig:workflow}. The correction is trained on a design of experiments (DOE) of 384 solved physical cases and validated against experimental literature data to assess its mechanical relevance.
+The global workflow is presented in Figure~\ref{fig:workflow}. The correction is trained on a design of experiments (DOE) of 384 solved physical cases and the CalculiX model is compared with published burst tests to assess its mechanical relevance.
 
 \begin{figure*}[t]
   \centering
@@ -220,7 +220,7 @@ The MLP obtains the best average performance in cross-validation and significant
 The genetic algorithm (GA) optimization loop was executed subject to a fiber-stress constraint corrected by the MLP and supplemented with a p95 residual margin. Across 10 random seeds, 17 unique optimized candidates were obtained. Finite element analysis in CalculiX of these 17 candidates at the \SI{87}{MPa} design pressure shows that the corrected prediction is conservative relative to the 95th percentile of the CalculiX fiber index for all 17 candidates, but relative to its pointwise maximum for only 4 of them; 5 candidates have a local CalculiX maximum above 1. The uncorrected fast model is non-conservative for all 17 candidates, even relative to the p95 value. This result constitutes an encouraging end-to-end check in the tested optimization domain, but does not represent a guarantee of physical safety outside this domain.
 
 \subsection{Reconstruction of the Hu 2021 Benchmark}
-The 70 MPa Type IV tank without dome reinforcement from \citet{Hu2021} was modeled. Although the global combined CalculiX index is not directly comparable to experimental burst, the pure fiber observable located at the dome yields a first failed ply at a calculated pressure of \SI{148.7}{MPa}. This value is in the same range as the experimental first fiber damage pressure reported by the authors (\SI{161}{MPa}, relative error of -7.6\%).
+The 70 MPa Type IV tank without dome reinforcement from \citet{Hu2021} was modeled. Although the global combined CalculiX index is not directly comparable to experimental burst, the pure fiber observable yields a first failed ply at a calculated pressure of \SI{148.7}{MPa}. This value is in the same range as the experimental first fiber damage pressure reported by the authors (\SI{161}{MPa}, relative error of -7.6\%). The location does not match, however: in the model the first failed ply is a hoop ply in the cylinder, whereas the authors report the dome region.
 
 \subsection{Reconstruction of the Agne 2025 Benchmark}
 The benchmark from \citet{Agne2025} (type IV CNG tanks in fiberglass GFRP and carbon fiber CFRP) was reconstructed from the exact published layup data. Due to ambiguity in winding notations, both the total signed plies convention and the plus/minus pairs convention were tested. Figure~\ref{fig:agne-conventions} shows the effect of these conventions on the composite thickness.
@@ -232,7 +232,7 @@ The benchmark from \citet{Agne2025} (type IV CNG tanks in fiberglass GFRP and ca
   \label{fig:agne-conventions}
 \end{figure}
 
-The numerical results at 16x16 resolution are summarized in the technical appendices section to preserve the main structure. Under the total signed-ply convention, the relative error with respect to the experimental burst pressure is -11.5\% for the GFRP vessel and -10.5\% for the CFRP vessel. The shell model therefore remains within the same physical order of magnitude for the fiber-failure observables, with a conservative trend suitable for preliminary design.
+With the fiber index used throughout this report (maximum, p95 and p99 over the vessel), the predicted burst pressure is 5.9 to 13.6\% below the experimental value for the GFRP vessel and 4.3 to 4.9\% below for the CFRP vessel, a range of 4 to 14\%. An earlier 16x16 run under the total signed-ply convention, kept in the appendix (Table~\ref{tab:agne16-results}), gave -11.5\% and -10.5\%, inside the same range. The shell model therefore remains within the same physical order of magnitude for the fiber-failure observables, with a conservative trend suitable for preliminary design.
 
 \subsection{Synthesis and Nature of Compared Quantities}
 \subsection{Negative Result: DLR 2025 Burst Test}
@@ -274,13 +274,15 @@ In the short term, before integrating contact modeling or complex 3D behaviors, 
 
 \section{Code and Data Availability}
 
-Reproducibility is ensured by a documented repository structure:
+All files below are in the public repository \url{https://github.com/clementdumeril/copv-type4-multifidelity}:
 \begin{itemize}
-    \item \url{livrables/main_public_en.tex}: Source code of the technical report.
-    \item \url{livrables/references_public.bib}: Resolved bibliographical database.
-    \item \url{type4_calibration/calibration/extended_statistical_validation.py}: Statistical validation script.
-    \item \url{type4_calibration/outputs_11l_single_boss/comparison_tables/extended_statistical_metrics.json}: JSON containing learning metrics.
-    \item \url{livrables/README_REPRODUCTION.md}: Step-by-step instructions for study reproduction.
+    \item \url{README.md}: overview and reproduction commands.
+    \item \url{code/high_fidelity/}: CalculiX case generator and post-processing.
+    \item \url{code/config/generate_doe_11l.py}: generator of the 384-case DOE.
+    \item \url{code/calibration/extended_statistical_validation.py}: statistical validation; rewrites \url{data/extended_statistical_metrics.json}.
+    \item \url{data/fiber_proxy_dataset.csv} and \url{data/doe_11l_single_boss_cases.json}: dataset and case roles.
+    \item \url{docs/VALIDATION.md}: benchmark, mesh and contact details.
+    \item \url{reports/english/main_public_en.tex} and \url{reports/references_public.bib}: source of this report.
 \end{itemize}
 
 \section*{Acknowledgements}
