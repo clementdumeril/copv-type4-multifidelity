@@ -1,0 +1,7 @@
+published_case,axial_mode,mesh,experimental_burst_pressure_mpa,fibre_proxy_pressure_mpa,fibre_proxy_pressure_p99_mpa
+EX-A,single_boss_reference,16,65.2,41.208626119660536,43.296548857208876
+EX-B,single_boss_reference,16,65.17,33.415647121703685,34.71633271155176
+EX-A,single_boss_reference,24,65.2,48.28073946155759,55.059895161066855
+EX-B,single_boss_reference,24,65.17,44.116373218958074,44.5331294753235
+EX-A,single_boss_reference,32,65.2,43.37628969815009,58.562657135561835
+EX-B,single_boss_reference,32,65.17,38.0084848713171,50.84736534095295

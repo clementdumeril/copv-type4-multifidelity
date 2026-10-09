@@ -1,0 +1,292 @@
+{
+  "composites": {
+    "carbon_epoxy_t700_like": {
+      "kind": "orthotropic_ud",
+      "density_kg_m3": 1580.0,
+      "young_modulus_mpa": [
+        151000.0,
+        9000.0,
+        9000.0
+      ],
+      "shear_modulus_mpa": [
+        5000.0,
+        5000.0,
+        5000.0
+      ],
+      "poisson_ratios": [
+        0.3,
+        0.3,
+        0.42
+      ],
+      "Xt_mpa": 2000.0,
+      "Xc_mpa": 1500.0,
+      "Yt_mpa": 50.0,
+      "Yc_mpa": 200.0,
+      "X12_mpa": 80.0
+    },
+    "carbon_epoxy_high_modulus": {
+      "kind": "orthotropic_ud",
+      "density_kg_m3": 1600.0,
+      "young_modulus_mpa": [
+        170000.0,
+        11000.0,
+        11000.0
+      ],
+      "shear_modulus_mpa": [
+        5500.0,
+        5500.0,
+        5500.0
+      ],
+      "poisson_ratios": [
+        0.29,
+        0.29,
+        0.4
+      ],
+      "Xt_mpa": 2200.0,
+      "Xc_mpa": 1600.0,
+      "Yt_mpa": 55.0,
+      "Yc_mpa": 220.0,
+      "X12_mpa": 90.0
+    },
+    "carbon_epoxy_t720sc_hu2021": {
+      "kind": "orthotropic_ud",
+      "source": "Hu, Chen and Pan 2021, IJHE, Table 2, T720SC/epoxy dome-reinforced Type IV vessel.",
+      "density_kg_m3": 1580.0,
+      "young_modulus_mpa": [
+        160000.0,
+        7420.0,
+        7420.0
+      ],
+      "shear_modulus_mpa": [
+        3710.0,
+        3710.0,
+        4790.0
+      ],
+      "poisson_ratios": [
+        0.26,
+        0.26,
+        0.47
+      ],
+      "Xt_mpa": 2800.0,
+      "Xc_mpa": 1379.0,
+      "Yt_mpa": 66.5,
+      "Yc_mpa": 268.5,
+      "X12_mpa": 58.7
+    },
+    "glass_epoxy_agne2025": {
+      "kind": "orthotropic_ud",
+      "source": "Agne et al. 2025, Composite Structures 370:119424, DOI 10.1016/j.compstruct.2025.119424.",
+      "density_kg_m3": 2000.0,
+      "young_modulus_mpa": [
+        36010.0,
+        6430.0,
+        6430.0
+      ],
+      "shear_modulus_mpa": [
+        2490.0,
+        2490.0,
+        2480.0
+      ],
+      "poisson_ratios": [
+        0.29,
+        0.29,
+        0.4
+      ],
+      "Xt_mpa": 625.3,
+      "Xc_mpa": 360.1,
+      "Yt_mpa": 13.7,
+      "Yc_mpa": 132.5,
+      "X12_mpa": 20.8
+    },
+    "glass_epoxy_paik2023": {
+      "kind": "orthotropic_ud",
+      "source": "Jin, Cheng, Bai, Paik and Li, Progressive failure analysis and burst mode study of Type IV composite vessels, accepted manuscript, Table 3.",
+      "density_kg_m3": 2000.0,
+      "young_modulus_mpa": [
+        45600.0,
+        10680.0,
+        10680.0
+      ],
+      "shear_modulus_mpa": [
+        4250.0,
+        4250.0,
+        3700.0
+      ],
+      "poisson_ratios": [
+        0.26,
+        0.26,
+        0.33
+      ],
+      "Xt_mpa": 860.0,
+      "Xc_mpa": 517.0,
+      "Yt_mpa": 40.0,
+      "Yc_mpa": 145.0,
+      "X12_mpa": 73.0
+    },
+    "carbon_epoxy_agne2025": {
+      "kind": "orthotropic_ud",
+      "source": "Agne et al. 2025, Composite Structures 370:119424, DOI 10.1016/j.compstruct.2025.119424.",
+      "density_kg_m3": 1600.0,
+      "young_modulus_mpa": [
+        53270.0,
+        15210.0,
+        15210.0
+      ],
+      "shear_modulus_mpa": [
+        5650.0,
+        5650.0,
+        5430.0
+      ],
+      "poisson_ratios": [
+        0.27,
+        0.27,
+        0.4
+      ],
+      "Xt_mpa": 830.7,
+      "Xc_mpa": 532.7,
+      "Yt_mpa": 7.0,
+      "Yc_mpa": 69.4,
+      "X12_mpa": 13.7
+    },
+    "t800_epoxy_team": {
+      "kind": "orthotropic_ud",
+      "source": "Team materiaux resultats ZIP, Utilitaire/calcul-hybride Excel synthesis, T800/epoxy candidate.",
+      "density_kg_m3": 1580.0,
+      "young_modulus_mpa": [
+        176769.0,
+        10335.0,
+        10335.0
+      ],
+      "shear_modulus_mpa": [
+        4895.0,
+        4895.0,
+        3400.0
+      ],
+      "poisson_ratios": [
+        0.33,
+        0.33,
+        0.4
+      ],
+      "Xt_mpa": 3365.0,
+      "Xc_mpa": 1724.0,
+      "Yt_mpa": 97.0,
+      "Yc_mpa": 290.0,
+      "X12_mpa": 97.0
+    },
+    "carbon_epoxy_t700sc_ly556_dlr2025": {
+      "kind": "orthotropic_ud",
+      "source": "DLR/Zenodo hydraulic burst pressure test dataset, Type IV CFRP/PA12 vessel, material values from Readme Table 2; DOI 10.5281/zenodo.10983652.",
+      "density_kg_m3": 1800.0,
+      "young_modulus_mpa": [
+        129400.0,
+        8050.0,
+        8050.0
+      ],
+      "shear_modulus_mpa": [
+        3910.0,
+        2850.0,
+        2850.0
+      ],
+      "poisson_ratios": [
+        0.317,
+        0.317,
+        0.41
+      ],
+      "Xt_mpa": 2089.0,
+      "Xc_mpa": 1032.0,
+      "Yt_mpa": 36.2,
+      "Yc_mpa": 164.4,
+      "X12_mpa": 52.2
+    },
+    "basalt_epoxy_team": {
+      "kind": "orthotropic_ud",
+      "source": "Team materiaux resultats ZIP, Utilitaire/calcul-hybride Excel synthesis, basalt/epoxy candidate.",
+      "density_kg_m3": 2100.0,
+      "young_modulus_mpa": [
+        52000.0,
+        14000.0,
+        14000.0
+      ],
+      "shear_modulus_mpa": [
+        5800.0,
+        5800.0,
+        4200.0
+      ],
+      "poisson_ratios": [
+        0.27,
+        0.27,
+        0.38
+      ],
+      "Xt_mpa": 1200.0,
+      "Xc_mpa": 700.0,
+      "Yt_mpa": 40.0,
+      "Yc_mpa": 140.0,
+      "X12_mpa": 45.0
+    }
+  },
+  "liners": {
+    "pa6_liner": {
+      "kind": "isotropic_polymer",
+      "density_kg_m3": 1140.0,
+      "E_mpa": 1800.0,
+      "nu": 0.39,
+      "yield_mpa": 45.0
+    },
+    "hdpe_liner": {
+      "kind": "isotropic_polymer",
+      "density_kg_m3": 950.0,
+      "E_mpa": 900.0,
+      "nu": 0.42,
+      "yield_mpa": 25.0
+    },
+    "pa6_liner_hu2021": {
+      "kind": "isotropic_polymer",
+      "source": "Hu, Chen and Pan 2021, IJHE, Table 1.",
+      "density_kg_m3": 1140.0,
+      "E_mpa": 1880.0,
+      "nu": 0.39,
+      "yield_mpa": 85.0
+    },
+    "hdpe_liner_agne2025": {
+      "kind": "isotropic_polymer",
+      "source": "Agne et al. 2025 Type IV CNG prototypes; elastic values are placeholder metadata for the present shell-only model.",
+      "density_kg_m3": 950.0,
+      "E_mpa": 900.0,
+      "nu": 0.42,
+      "yield_mpa": 25.0
+    },
+    "pa12_liner_dlr2025": {
+      "kind": "isotropic_polymer",
+      "source": "DLR/Zenodo hydraulic burst pressure test dataset, Type IV CFRP/PA12 vessel; liner metadata used for documentation only in the shell model.",
+      "density_kg_m3": 1010.0,
+      "E_mpa": 1500.0,
+      "nu": 0.39,
+      "yield_mpa": 45.0
+    }
+  },
+  "bosses": {
+    "aluminum_6061_t6": {
+      "kind": "isotropic_metal",
+      "density_kg_m3": 2700.0,
+      "E_mpa": 69000.0,
+      "nu": 0.33,
+      "yield_mpa": 276.0
+    },
+    "stainless_316": {
+      "kind": "isotropic_metal",
+      "density_kg_m3": 8000.0,
+      "E_mpa": 193000.0,
+      "nu": 0.3,
+      "yield_mpa": 205.0
+    },
+    "aluminum_6061_t6_hu2021": {
+      "kind": "isotropic_metal",
+      "source": "Hu, Chen and Pan 2021, IJHE, Table 1.",
+      "density_kg_m3": 2700.0,
+      "E_mpa": 74120.0,
+      "nu": 0.28,
+      "yield_mpa": 280.0,
+      "ultimate_mpa": 368.0
+    }
+  }
+}
