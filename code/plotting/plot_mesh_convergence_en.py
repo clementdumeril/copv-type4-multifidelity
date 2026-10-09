@@ -1,15 +1,15 @@
-import json
+"""Mesh study on the Jin et al. (2022) EX-A / EX-B vessels: fibre-proxy burst pressure vs mesh density."""
+import csv
 import math
 from pathlib import Path
 import matplotlib.pyplot as plt
 
-json_path = Path("type4_calibration/outputs/validation/paik2023_mesh_convergence/paik2023_mesh_convergence_results.json")
-output_png = Path("livrables/figures/paik2023_mesh_convergence_en.png")
+REPO = Path(__file__).resolve().parents[2]
+csv_path = REPO / "data" / "jin2022_mesh_convergence.csv"
+output_png = REPO / "reports" / "figures" / "paik2023_mesh_convergence_en.png"
 
-with open(json_path, "r", encoding="utf-8") as f:
-    data = json.load(f)
-
-rows = data["rows"]
+with open(csv_path, "r", encoding="utf-8") as f:
+    rows = [{k: (v if k in ("published_case", "axial_mode") else float(v)) for k, v in r.items()} for r in csv.DictReader(f)]
 labels = sorted({row["published_case"] for row in rows})
 modes = list(dict.fromkeys(row["axial_mode"] for row in rows))
 

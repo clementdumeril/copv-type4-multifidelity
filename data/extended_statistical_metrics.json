@@ -1,6 +1,6 @@
 {
   "dataset_metadata": {
-    "path": "d:\\SimulationD\\genetic_claude_V2\\type4_calibration\\outputs_11l_single_boss\\comparison_tables\\fiber_proxy_dataset.csv",
+    "path": "data/fiber_proxy_dataset.csv",
     "total_rows": 384,
     "duplicates": 0,
     "data_leakage_train_eval_intersection": 0,

@@ -19,11 +19,14 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from calibration_utils import CASES_FILE, COMPARISON, FIGURES, MODELS, read_csv, write_json  # noqa: E402
+from calibration_utils import write_json  # noqa: E402
 
-DATASET = COMPARISON / "fiber_proxy_dataset.csv"
-DOE_CASES = Path(os.environ.get("TYPE4_CASES_FILE", ROOT / "config" / "doe_11l_single_boss_cases.json"))
-OUT_METRICS = COMPARISON / "extended_statistical_metrics.json"
+REPO = ROOT.parent
+DATA = REPO / "data"
+FIGURES = REPO / "reports" / "figures"
+DATASET = DATA / "fiber_proxy_dataset.csv"
+DOE_CASES = Path(os.environ.get("TYPE4_CASES_FILE", DATA / "doe_11l_single_boss_cases.json"))
+OUT_METRICS = DATA / "extended_statistical_metrics.json"
 
 NUMERIC_FEATURES = [
     "pressure_mpa", "inner_radius_mm", "cylindrical_length_mm", "boss_radius_mm",
@@ -351,7 +354,7 @@ def main():
         eval_y_pred = np.exp(predictions_on_eval[name][:, 0])
         plt.scatter(eval_y_actual, eval_y_pred, label=f"{name} ($R^2={summary_eval[name]['eval_r2']:.3f}$)", alpha=0.7, s=25)
         
-    plt.plot([1.0, 4.5], [1.0, 4.5], 'k--', label="Reference $C_{\\text{CalculiX}} = C_{\\text{Python}}$")
+    plt.plot([1.0, 4.5], [1.0, 4.5], 'k--', label="perfect prediction")
     plt.xlabel("Actual CalculiX Correction Factor ($C_{\\text{CalculiX}}$)")
     plt.ylabel("Predicted Correction Factor ($C_{\\text{predicted}}$)")
     plt.title("Prediction vs. Reference on Evaluation Set (96 cases)")
@@ -378,7 +381,7 @@ def main():
     # Write json
     output_payload = {
         "dataset_metadata": {
-            "path": str(DATASET),
+            "path": DATASET.relative_to(REPO).as_posix(),
             "total_rows": len(df),
             "duplicates": int(duplicates),
             "data_leakage_train_eval_intersection": leakage,
