@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -14,6 +15,8 @@ from calibration_utils import SIM_RESULTS, ensure_dirs, write_json  # noqa: E402
 
 
 def find_ccx() -> Path | None:
+    if os.environ.get("CCX"):  # path to the ccx executable, e.g. /usr/bin/ccx
+        return Path(os.environ["CCX"])
     candidates = [
         ROOT / "tools" / "CalculiX-2.23.0-win-x64" / "CalculiX-2.23.0-win-x64" / "bin" / "ccx_MT.exe",
         ROOT / "tools" / "CalculiX-2.23.0-win-x64" / "CalculiX-2.23.0-win-x64" / "bin" / "ccx.exe",
