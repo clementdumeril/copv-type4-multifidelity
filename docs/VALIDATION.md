@@ -17,6 +17,10 @@ The first campaign (128 cases) varied the vessel size widely. After feedback tha
 | Pressure | 70 MPa (360 cases); 52.5 and 87.5 MPa (12 each, pressure-extrapolation split) |
 | Hoop thickness kept in the dome (`coverage_epsilon`) | 0.20 to 0.35 |
 
+### Hoop plies in the dome
+
+The fiber index peaks in a hoop ply in 179 of the 198 cases where it peaks in a dome. In `calibration_utils.py`, hoop plies (|angle| ≥ 80°) keep their nominal angle in the dome (`local_ply_angle_deg`). Their thickness is scaled by a logistic coverage weight that falls to `coverage_epsilon` (0.20 to 0.35 in this DOE) below the turnaround radius, 0.985 × the inner radius (`ply_coverage_weight`). So 20 to 35 % of the hoop thickness remains, at about 88°, down to the polar opening. Real hoop winding stops at the end of the cylinder, so part of the dome peak may come from this modelling choice. [TODO Clément: validate.]
+
 Case roles are fixed in [`data/doe_11l_single_boss_cases.json`](../data/doe_11l_single_boss_cases.json): 288 train, 48 in-distribution holdout, 24 geometric boundary, 24 pressure scale.
 
 ## Correctors
