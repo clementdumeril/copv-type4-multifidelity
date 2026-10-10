@@ -35,7 +35,7 @@ The target uses the maximum of the shell-model fiber index, which sits in the ri
 - **The maximum is not mesh-converged.** Four designs were re-solved at 16 to 64 elements per direction. The 95th percentile changes by ≈ 0.4 % between 48 and 64. The maximum does not settle (design 0122: 0.85 at 16×16, 1.11 at 64×64), and the critical ply is a hoop ply at the DOE mesh but a transition ply at 64×64 in all four designs.
 - **It depends on a coverage floor.** Below its turnaround radius, every ply keeps 20 to 35 % of its thickness at an angle near 90°, a convention of the code. Removing hoop coverage from the dome raises the peak (0.86 to 1.16) and moves it to a transition ply.
 - **In 202 designs no helical ply reaches the polar opening.** The helical turnaround radius R·sin α exceeds the boss radius, and the floor covers the gap. Geodesic winding needs α ≈ arcsin(r_boss/R); only about 50 designs are close.
-- **The peak always lands on the left pole.** Clamping no boss at all changes the peak by at most 4 %, so the boundary condition is not the cause; the case generator labels the two polar rings differently.
+- **The polar edges carry no end-cap force.** The DOE omits the axial load p·π·r_boss² from the boss. Adding it raises the maximum by 27 to 54 % in four designs, while the 95th percentile moves by less than 1 %. (Pole statistics are also skewed: 190 of the 205 polar peaks are at the left pole, partly because the right polar ring is labelled "boss".)
 
 ![Fiber index against mesh density for four designs, with the DOE coverage law (top) and with plies stopped at their turnaround radius (bottom)](figures/mesh_study.png)
 
