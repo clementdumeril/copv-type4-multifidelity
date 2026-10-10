@@ -1,0 +1,9 @@
+variant,mesh,case_id,solver_status,max_fiber_stress_ratio_abs,fiber_stress_ratio_p95_abs,fiber_stress_ratio_p99_abs,fiber_proxy_zone,fiber_proxy_ply_name,fiber_proxy_local_angle_deg,failure_stress_samples
+include_boss_endcap_force=True,24,11l_0122,ccx_completed,1.1506603198676257,0.419120931488939,0.9069112540025159,left_dome,hoop_2_minus,-87.85,91392
+include_boss_endcap_force=True,24,11l_0318,ccx_completed,0.7513308901544009,0.2602258723586218,0.39312420792662894,left_dome,hoop_1_minus,-88.67,102816
+include_boss_endcap_force=True,24,11l_0136,ccx_completed,1.0067520668648198,0.34758517229207564,0.7034793691810783,left_dome,hoop_2_minus,-88.56,91392
+include_boss_endcap_force=True,24,11l_0007,ccx_completed,0.6875954179497004,0.37510876307765717,0.5133712704638618,left_dome,hoop_2_minus,-86.54,91392
+include_boss_endcap_force=True,64,11l_0122,ccx_completed,1.6437921653425143,0.43448076034472816,0.9631127412409299,left_dome,transition_1_plus,87.43744126687687,632832
+include_boss_endcap_force=True,64,11l_0318,ccx_completed,0.6387701596937391,0.2642993607237314,0.32813829171810316,left_dome,transition_1_plus,87.43744126687687,711936
+include_boss_endcap_force=True,64,11l_0136,ccx_completed,1.0586861927061624,0.34480240578982013,0.4606921075933271,left_dome,transition_1_plus,87.43744126687687,632832
+include_boss_endcap_force=True,64,11l_0007,ccx_completed,0.9400512269231539,0.38395883109764845,0.6322016041727083,left_dome,transition_2_minus,-87.43744126687687,632832
