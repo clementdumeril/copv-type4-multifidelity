@@ -40,7 +40,7 @@ from postprocess_calculix_case import (  # noqa: E402
 )
 
 PVPYTHON = Path(r"C:\Program Files\ParaView 6.1.0\bin\pvpython.exe")
-FIG_DIR = ROOT.parent / "reports" / "figures"
+FIG_DIR = ROOT.parent / "figures"
 
 
 def element_fiber_index(case: dict, case_dir: Path) -> dict[int, float]:

@@ -675,6 +675,8 @@ def local_ply_failure(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Post-process the CalculiX FRD and orientation fields.")
     parser.add_argument("--case-id", default="cal_001")
+    parser.add_argument("--max-samples", type=int, default=200000,
+                        help="Stress rows above this count are strided; raise it for fine meshes.")
     args = parser.parse_args()
 
     ensure_dirs()
@@ -717,7 +719,7 @@ def main() -> None:
         case = cases.get(base_case_id)
         if case:
             materials = load_materials()
-            failure_summary, critical_rows, mode_rows = local_ply_failure(case, frd, Path(manifest["orientation_csv"]), materials=materials)
+            failure_summary, critical_rows, mode_rows = local_ply_failure(case, frd, Path(manifest["orientation_csv"]), materials=materials, max_samples=args.max_samples)
             stats.update(failure_summary)
             if critical_rows:
                 write_csv(case_dir / "calculix_critical_ply_projection.csv", critical_rows)

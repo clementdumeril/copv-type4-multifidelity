@@ -19,7 +19,7 @@ SIM_RESULTS = OUTPUTS / "simulation_results"
 COMPARISON = OUTPUTS / "comparison_tables"
 MODELS = OUTPUTS / "correction_models"
 FIGURES = OUTPUTS / "figures"
-REPORTS = ROOT / "reports"
+REPORTS = OUTPUTS / "reports"
 
 
 def ensure_dirs() -> None:
@@ -271,6 +271,18 @@ def coverage_epsilon(case: dict[str, Any]) -> float:
     return max(1e-4, min(0.40, value))
 
 
+def hoop_coverage_epsilon(case: dict[str, Any]) -> float:
+    """Residual weight of hoop plies (|angle| >= 80 deg) below their turnaround radius.
+
+    Defaults to coverage_epsilon. Setting `hoop_coverage_epsilon: 0` in a case's
+    winding block removes the hoop plies from the dome (ablation used in paper/).
+    """
+    wind = case.get("winding", {})
+    if wind.get("hoop_coverage_epsilon") in (None, ""):
+        return coverage_epsilon(case)
+    return max(0.0, min(0.40, float(wind["hoop_coverage_epsilon"])))
+
+
 def coverage_transition_width_mm(case: dict[str, Any], ply: dict[str, Any]) -> float:
     wind = case.get("winding", {})
     if "coverage_transition_width_mm" in ply:
@@ -336,6 +348,10 @@ def ply_coverage_weight(
     coverage = ply.get("coverage_zones")
     smooth = case is not None and smooth_coverage_enabled(case)
     eps = coverage_epsilon(case) if case is not None else 0.0
+    if case is not None and abs(float(ply.get("angle_deg", 0.0))) >= 80.0:
+        eps = hoop_coverage_epsilon(case)
+    if case is not None and case.get("winding", {}).get("strict_turnaround"):
+        eps = 0.0  # every ply ends at its own geodesic turnaround radius
     if coverage and zone not in set(str(item) for item in coverage):
         if "coverage_outside_zones_weight" in ply:
             return max(0.0, float(ply["coverage_outside_zones_weight"]))
@@ -351,7 +367,12 @@ def ply_coverage_weight(
         return 1.0
     width = coverage_transition_width_mm(case, ply)
     raw = stable_logistic((radius_mm - float(turnaround)) / width)
-    return max(eps, min(1.0, eps + (1.0 - eps) * raw))
+    weight = max(eps, min(1.0, eps + (1.0 - eps) * raw))
+    if eps == 0.0 and weight < 0.05:
+        # Ablation mode: below 5 % of its nominal thickness the ply is dropped. A thinner
+        # residual ply would still carry the full circumferential strain at the pole.
+        return 0.0
+    return weight
 
 
 def ply_is_active(ply: dict[str, Any], zone: str, radius_mm: float, case: dict[str, Any] | None = None) -> bool:

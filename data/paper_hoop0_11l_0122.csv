@@ -1,0 +1,2 @@
+variant,mesh,case_id,solver_status,max_fiber_stress_ratio_abs,fiber_stress_ratio_p95_abs,fiber_stress_ratio_p99_abs,fiber_proxy_zone,fiber_proxy_ply_name,fiber_proxy_local_angle_deg,failure_stress_samples
+hoop_coverage_epsilon=0,24,11l_0122,ccx_completed,1.1641889838038213,0.4306222951656502,0.5586501280425222,left_dome,transition_2_minus,-87.43744126687687,86784
