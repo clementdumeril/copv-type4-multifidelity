@@ -3,7 +3,7 @@
 
     python code/plotting/make_readme_figures.py
 
-Outputs (reports/figures/):
+Outputs (figures/):
   readme_hero.png         CalculiX fiber-index field of case 11l_0122 next to the
                           critical-zone counts of the fast model and CalculiX (384 cases)
   readme_ga_check.png     fiber index of the 17 GA-optimised designs: fast model,
@@ -22,7 +22,7 @@ import pandas as pd
 
 REPO = Path(__file__).resolve().parents[2]
 DATA = REPO / "data"
-FIG = REPO / "reports" / "figures"
+FIG = REPO / "figures"
 
 ZONES = ["cylinder", "junction", "left_dome", "right_dome", "boss"]
 ZONE_LABELS = ["cylinder", "dome-cylinder\njunction", "dome\n(fixed boss)", "dome\n(sliding boss)", "boss\nedge"]

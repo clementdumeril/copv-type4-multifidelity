@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 REPO = Path(__file__).resolve().parents[2]
 csv_path = REPO / "data" / "jin2022_mesh_convergence.csv"
-output_png = REPO / "reports" / "figures" / "paik2023_mesh_convergence_en.png"
+output_png = REPO / "figures" / "jin2022_mesh_convergence.png"
 
 with open(csv_path, "r", encoding="utf-8") as f:
     rows = [{k: (v if k in ("published_case", "axial_mode") else float(v)) for k, v in r.items()} for r in csv.DictReader(f)]

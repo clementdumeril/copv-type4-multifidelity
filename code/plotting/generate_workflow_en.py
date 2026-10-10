@@ -2,7 +2,7 @@
 
     python code/plotting/generate_workflow_en.py [en|fr]
 
-Writes reports/figures/fig_workflow_en.png (en) or fig_workflow.png (fr).
+Writes figures/fig_workflow_en.png (en) or figures/fig_workflow_fr.png (fr).
 Dashed grey boxes are the external codebase (fast model and genetic optimizer).
 """
 import sys
@@ -11,7 +11,7 @@ from pathlib import Path
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 
-FIG = Path(__file__).resolve().parents[2] / "reports" / "figures"
+FIG = Path(__file__).resolve().parents[2] / "figures"
 
 TEXT = {
     "en": {
@@ -96,7 +96,7 @@ def generate_chart(lang: str = "en") -> None:
     arrow(3.9, 3.0, 3.1, 3.0)    # GA designs -> CalculiX re-check
 
     plt.tight_layout()
-    out = FIG / ("fig_workflow_en.png" if lang == "en" else "fig_workflow.png")
+    out = FIG / ("fig_workflow_en.png" if lang == "en" else "fig_workflow_fr.png")
     plt.savefig(out, dpi=300, bbox_inches="tight")
     plt.close()
     print(f"wrote {out}")

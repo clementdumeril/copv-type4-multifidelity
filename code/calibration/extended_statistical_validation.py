@@ -23,10 +23,14 @@ from calibration_utils import write_json  # noqa: E402
 
 REPO = ROOT.parent
 DATA = REPO / "data"
-FIGURES = REPO / "reports" / "figures"
-DATASET = DATA / "fiber_proxy_dataset.csv"
+FIGURES = REPO / "figures"
+# Defaults reproduce the committed results; the environment variables let the same protocol
+# run on another dataset (e.g. the strict-turnaround variant used in paper/).
+DATASET = Path(os.environ.get("TYPE4_DATASET", DATA / "fiber_proxy_dataset.csv"))
 DOE_CASES = Path(os.environ.get("TYPE4_CASES_FILE", DATA / "doe_11l_single_boss_cases.json"))
-OUT_METRICS = DATA / "extended_statistical_metrics.json"
+OUT_METRICS = Path(os.environ.get("TYPE4_METRICS_OUT", DATA / "extended_statistical_metrics.json"))
+OUT_PREDICTIONS = OUT_METRICS.with_name(OUT_METRICS.stem.replace("metrics", "eval_predictions") + ".csv")
+SAVE_FIGURES = "TYPE4_NO_FIGURES" not in os.environ
 
 NUMERIC_FEATURES = [
     "pressure_mpa", "inner_radius_mm", "cylindrical_length_mm", "boss_radius_mm",
@@ -326,6 +330,15 @@ def main():
             "pressure_r2": r2_score(y[pressure_scale_idx], pred_pressure)
         }
         
+    # Held-out predictions, for plotting outside this script (paper/)
+    pred_table = pd.DataFrame({
+        "case_id": df["case_id"].values[eval_idx],
+        "doe_role": df["doe_role"].values[eval_idx],
+        "C_calculix": np.exp(y[eval_idx, 0]),
+        **{f"C_pred_{name}": np.exp(pred[:, 0]) for name, pred in predictions_on_eval.items()},
+    })
+    pred_table.to_csv(OUT_PREDICTIONS, index=False)
+
     # 3. Zone-separated performance on Eval Set
     zones = ["left_dome", "cylinder", "junction", "boss"]
     zone_metrics = {}
@@ -346,42 +359,43 @@ def main():
                 }
                 
     # 4. Generate plots
-    # Plot 1: Scatter plot
-    plt.figure(figsize=(8, 6), dpi=150)
-    eval_y_actual = np.exp(y[eval_idx, 0])
+    if SAVE_FIGURES:
+        # Plot 1: Scatter plot
+        plt.figure(figsize=(8, 6), dpi=150)
+        eval_y_actual = np.exp(y[eval_idx, 0])
     
-    for name in ["OLS", "Ridge", "MLP"]:
-        eval_y_pred = np.exp(predictions_on_eval[name][:, 0])
-        plt.scatter(eval_y_actual, eval_y_pred, label=f"{name} ($R^2={summary_eval[name]['eval_r2']:.3f}$)", alpha=0.7, s=25)
+        for name in ["OLS", "Ridge", "MLP"]:
+            eval_y_pred = np.exp(predictions_on_eval[name][:, 0])
+            plt.scatter(eval_y_actual, eval_y_pred, label=f"{name} ($R^2={summary_eval[name]['eval_r2']:.3f}$)", alpha=0.7, s=25)
         
-    plt.plot([1.0, 4.5], [1.0, 4.5], 'k--', label="perfect prediction")
-    plt.xlabel("Actual CalculiX Correction Factor ($C_{\\text{CalculiX}}$)")
-    plt.ylabel("Predicted Correction Factor ($C_{\\text{predicted}}$)")
-    plt.title("Prediction vs. Reference on Evaluation Set (96 cases)")
-    plt.legend()
-    plt.grid(True, linestyle=":", alpha=0.6)
-    plt.savefig(FIGURES / "extended_benchmark_nuage_en.png", bbox_inches="tight")
-    plt.close()
+        plt.plot([1.0, 4.5], [1.0, 4.5], 'k--', label="perfect prediction")
+        plt.xlabel("Actual CalculiX Correction Factor ($C_{\\text{CalculiX}}$)")
+        plt.ylabel("Predicted Correction Factor ($C_{\\text{predicted}}$)")
+        plt.title("Prediction vs. Reference on Evaluation Set (96 cases)")
+        plt.legend()
+        plt.grid(True, linestyle=":", alpha=0.6)
+        plt.savefig(FIGURES / "extended_benchmark_nuage_en.png", bbox_inches="tight")
+        plt.close()
     
-    # Plot 2: Residuals Histogram
-    plt.figure(figsize=(8, 6), dpi=150)
-    for name in ["OLS", "Ridge", "MLP"]:
-        residuals = y[eval_idx, 0] - predictions_on_eval[name][:, 0]
-        plt.hist(residuals, bins=15, alpha=0.5, label=f"{name} (MAE={summary_eval[name]['eval_mae']:.3f})", density=True)
+        # Plot 2: Residuals Histogram
+        plt.figure(figsize=(8, 6), dpi=150)
+        for name in ["OLS", "Ridge", "MLP"]:
+            residuals = y[eval_idx, 0] - predictions_on_eval[name][:, 0]
+            plt.hist(residuals, bins=15, alpha=0.5, label=f"{name} (MAE={summary_eval[name]['eval_mae']:.3f})", density=True)
         
-    plt.axvline(0, color='k', linestyle='--')
-    plt.xlabel("Prediction Residual $\\log(C_{\\text{actual}}) - \\log(C_{\\text{predicted}})$")
-    plt.ylabel("Density")
-    plt.title("Histogram of Log Residuals on Evaluation Set")
-    plt.legend()
-    plt.grid(True, linestyle=":", alpha=0.6)
-    plt.savefig(FIGURES / "extended_benchmark_residus_en.png", bbox_inches="tight")
-    plt.close()
+        plt.axvline(0, color='k', linestyle='--')
+        plt.xlabel("Prediction Residual $\\log(C_{\\text{actual}}) - \\log(C_{\\text{predicted}})$")
+        plt.ylabel("Density")
+        plt.title("Histogram of Log Residuals on Evaluation Set")
+        plt.legend()
+        plt.grid(True, linestyle=":", alpha=0.6)
+        plt.savefig(FIGURES / "extended_benchmark_residus_en.png", bbox_inches="tight")
+        plt.close()
     
     # Write json
     output_payload = {
         "dataset_metadata": {
-            "path": DATASET.relative_to(REPO).as_posix(),
+            "path": DATASET.relative_to(REPO).as_posix() if DATASET.is_relative_to(REPO) else DATASET.name,
             "total_rows": len(df),
             "duplicates": int(duplicates),
             "data_leakage_train_eval_intersection": leakage,

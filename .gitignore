@@ -1,2 +1,9 @@
 __pycache__/
 *.pyc
+paper/*.bbl
+paper/*.aux
+paper/*.log
+paper/*.blg
+paper/*.out
+paper/*.fls
+paper/*.fdb_latexmk

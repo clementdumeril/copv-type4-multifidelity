@@ -17,9 +17,9 @@ The first campaign (128 cases) varied the vessel size widely. After feedback tha
 | Pressure | 70 MPa (360 cases); 52.5 and 87.5 MPa (12 each, pressure-extrapolation split) |
 | Hoop thickness kept in the dome (`coverage_epsilon`) | 0.20 to 0.35 |
 
-### Hoop plies in the dome
+### Coverage law near the pole
 
-The fiber index peaks in a hoop ply in 179 of the 198 cases where it peaks in a dome. In `calibration_utils.py`, hoop plies (|angle| ≥ 80°) keep their nominal angle in the dome (`local_ply_angle_deg`). Their thickness is scaled by a logistic coverage weight that falls to `coverage_epsilon` (0.20 to 0.35 in this DOE) below the turnaround radius, 0.985 × the inner radius (`ply_coverage_weight`). So 20 to 35 % of the hoop thickness remains, at about 88°, down to the polar opening. Real hoop winding stops at the end of the cylinder, so part of the dome peak may come from this modelling choice.
+Below its turnaround radius (0.985 R for hoop plies, R sin α for the others), every ply keeps `coverage_epsilon` (0.20 to 0.35) of its thickness, and its geodesic angle tends to 90°. In 179 of the 198 dome-critical designs the peak is in a hoop ply, but the mechanism is not specific to hoops: removing hoop coverage from the dome moves the peak to a transition ply at the same radius and raises it. In 202 of the 384 designs no geodesic ply can reach the polar opening (R sin α larger than the boss radius). See the audit in [`paper/main.pdf`](../paper/main.pdf), section 6, and the data in `data/paper_mesh_study.csv`, `data/fiber_proxy_dataset_strict.csv` and `data/paper_hoop0_11l_0122.csv`.
 
 Case roles are fixed in [`data/doe_11l_single_boss_cases.json`](../data/doe_11l_single_boss_cases.json): 288 train, 48 in-distribution holdout, 24 geometric boundary, 24 pressure scale.
 
@@ -78,7 +78,7 @@ The ranges for Agne span the maximum, p95 and p99 of the fiber index. For Hu, th
 
 The mesh study uses vessels EX-A and EX-B of Jin et al. 2022, at 16, 24 and 32 elements per direction ([`data/jin2022_mesh_convergence.csv`](../data/jin2022_mesh_convergence.csv)).
 
-![Mesh study on the Jin et al. 2022 vessels](../reports/figures/paik2023_mesh_convergence_en.png)
+![Mesh study on the Jin et al. 2022 vessels](../figures/jin2022_mesh_convergence.png)
 
 | Predicted burst (MPa) | 16 | 24 | 32 |
 |---|---:|---:|---:|
