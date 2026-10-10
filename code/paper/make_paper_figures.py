@@ -64,6 +64,15 @@ def collect(runs: Path) -> None:
         s = json.loads(hoop0.read_text(encoding="utf-8"))
         pd.DataFrame([{"variant": "hoop_coverage_epsilon=0", "mesh": 24, "case_id": "11l_0122",
                        **{k: s.get(k, "") for k in SUMMARY_KEYS}}]).to_csv(DATA / "paper_hoop0_11l_0122.csv", index=False)
+    bc_rows = []
+    for case in MESH_CASES:
+        f = runs / "bc_minimal_pins_m24" / "simulation_results" / "calculix" / case / "calculix_summary.json"
+        if f.exists():
+            s = json.loads(f.read_text(encoding="utf-8"))
+            bc_rows.append({"variant": "axial_constraint=minimal_pins", "mesh": 24, "case_id": case,
+                            **{k: s.get(k, "") for k in SUMMARY_KEYS}})
+    if bc_rows:
+        pd.DataFrame(bc_rows).to_csv(DATA / "paper_bc_minimal_pins.csv", index=False)
     strict = runs / "strict_m24"
     if (strict / "simulation_results").exists():
         subprocess.run([sys.executable, str(REPO / "code" / "paper" / "build_variant_dataset.py"),
@@ -93,21 +102,21 @@ def fig_scatter() -> None:
 def fig_field_zones() -> None:
     df = pd.read_csv(DATA / "fiber_proxy_dataset.csv")
     zones = ["cylinder", "junction", "left_dome", "right_dome", "boss"]
-    labels = ["cylinder", "junction", "dome\n(fixed boss)", "dome\n(sliding boss)", "boss\nedge"]
+    labels = ["cyl.", "junct.", "left\ndome", "right\ndome", "boss\nedge"]
     fast = df.python_raw_critical_zone.value_counts().reindex(zones, fill_value=0)
     fe = df.calculix_fiber_proxy_zone.value_counts().reindex(zones, fill_value=0)
     img = mpimg.imread(REPO / "figures" / "fiber_index_field_11l_0122.png")
     h, w = img.shape[:2]
     img = img[int(0.14 * h): int(0.82 * h), int(0.2 * w): int(0.85 * w)]
     vmax = float(df.set_index("case_id").loc["11l_0122", "calculix_fiber_stress_ratio_max"])
-    fig = plt.figure(figsize=(7.2, 2.6))
-    ax0 = fig.add_axes([0.0, 0.05, 0.48, 0.9])
+    fig = plt.figure(figsize=(7.2, 2.8))
+    ax0 = fig.add_axes([0.0, 0.05, 0.45, 0.9])
     ax0.imshow(img)
     ax0.axis("off")
-    cax = fig.add_axes([0.49, 0.2, 0.012, 0.6])
+    cax = fig.add_axes([0.46, 0.2, 0.012, 0.6])
     bar = fig.colorbar(matplotlib.cm.ScalarMappable(matplotlib.colors.Normalize(0, vmax), "inferno"), cax=cax)
     bar.set_label(r"$|\sigma_{11}|/X$")
-    ax1 = fig.add_axes([0.62, 0.22, 0.37, 0.7])
+    ax1 = fig.add_axes([0.66, 0.27, 0.33, 0.65])
     x = np.arange(len(zones))
     ax1.bar(x - 0.2, fast.values, 0.4, color="#9aa5b1", label="fast model")
     ax1.bar(x + 0.2, fe.values, 0.4, color="#c2410c", label="CalculiX")
@@ -148,7 +157,8 @@ def fig_mesh(m: pd.DataFrame) -> None:
                 ax.set_title(case, fontsize=8)
             else:
                 ax.set_xlabel("elements per direction")
-            ax.set_xticks(MESHES)
+            ax.set_xticks([16, 32, 48, 64])
+            ax.axvline(24, color="0.6", lw=0.6, ls=":")  # mesh used for the DOE
         axes[row][0].set_ylabel(f"{variant}\n" + r"$|\sigma_{11}|/X$")
     axes[0][0].legend(frameon=False, fontsize=6)
     fig.tight_layout()
@@ -225,19 +235,39 @@ def numbers(m: pd.DataFrame | None, strict: pd.DataFrame | None) -> None:
     n["CninetyfiveMedian"], n["CninetyfiveMin"], n["CninetyfiveMax"] = fmt(c95.median(), 2), fmt(c95.min(), 2), fmt(c95.max(), 2)
     n["NCninetyfiveWithinTen"] = int(((c95 - 1).abs() <= 0.10).sum())
 
-    def row(fname: str) -> str:
-        mm = json.loads((DATA / fname).read_text(encoding="utf-8"))
-        c, e = mm["cross_validation_metrics"], mm["evaluation_metrics"]
-        return " & ".join(f"${c[k]['r2_mean']:.2f}$ & ${e[k]['eval_r2']:.2f}$" for k in ("OLS", "Ridge", "MLP"))
+    rng = np.random.default_rng(0)
 
-    n["TargetRowBaselineMax"] = row("extended_statistical_metrics.json")
-    n["TargetRowBaselinePninetyfive"] = row("extended_statistical_metrics_p95_target.json")
+    def boot_r2(y: np.ndarray, yhat: np.ndarray, n_boot: int = 2000) -> tuple[float, float]:
+        vals = []
+        for _ in range(n_boot):
+            i = rng.integers(0, len(y), len(y))
+            ss = ((y[i] - y[i].mean()) ** 2).sum()
+            if ss > 0:
+                vals.append(1 - ((y[i] - yhat[i]) ** 2).sum() / ss)
+        return float(np.percentile(vals, 2.5)), float(np.percentile(vals, 97.5))
+
+    def row(tag: str) -> str:
+        """n | const RMSE | Ridge CV, held-out [CI], RMSE | MLP CV, held-out [CI], RMSE (all on log C)."""
+        mm = json.loads((DATA / f"extended_statistical_metrics{tag}.json").read_text(encoding="utf-8"))
+        pr = pd.read_csv(DATA / f"extended_statistical_eval_predictions{tag}.csv")
+        y = np.log(pr.C_calculix.values)
+        c, e, md = mm["cross_validation_metrics"], mm["evaluation_metrics"], mm["dataset_metadata"]
+        cells = [f"{md['train_count']}/{md['eval_count']}", f"{e['Constant']['eval_rmse']:.3f}"]
+        for k in ("Ridge", "MLP"):
+            lo, hi = boot_r2(y, np.log(pr[f"C_pred_{k}"].values))
+            cells += [f"${c[k]['r2_mean']:.2f}$", f"${e[k]['eval_r2']:.2f}$ \\scriptsize[${lo:.2f}$, ${hi:.2f}$]",
+                      f"{e[k]['eval_rmse']:.3f}"]
+        return " & ".join(cells)
+
+    n["TargetRowBaselineMax"] = row("")
+    n["TargetRowBaselineMaxSubset"] = row("_baseline_182")
+    n["TargetRowBaselinePninetyfive"] = row("_p95_target")
     pt = json.loads((DATA / "extended_statistical_metrics_p95_target.json").read_text(encoding="utf-8"))
     n["RtwoCvMlpPninetyfive"] = fmt(pt["cross_validation_metrics"]["MLP"]["r2_mean"], 2)
     n["RtwoEvalMlpPninetyfive"] = fmt(pt["evaluation_metrics"]["MLP"]["eval_r2"], 2)
     if strict is not None:
-        n["TargetRowStrictMax"] = row("extended_statistical_metrics_strict_max.json")
-        n["TargetRowStrictPninetyfive"] = row("extended_statistical_metrics_strict_p95.json")
+        n["TargetRowStrictMax"] = row("_strict_max")
+        n["TargetRowStrictPninetyfive"] = row("_strict_p95")
         sm = json.loads((DATA / "extended_statistical_metrics_strict_p95.json").read_text(encoding="utf-8"))
         n["NstrictTrain"], n["NstrictEval"] = sm["dataset_metadata"]["train_count"], sm["dataset_metadata"]["eval_count"]
         n["RtwoEvalRidgeStrictPninetyfive"] = fmt(sm["evaluation_metrics"]["Ridge"]["eval_r2"], 2)
@@ -249,12 +279,39 @@ def numbers(m: pd.DataFrame | None, strict: pd.DataFrame | None) -> None:
         def change(variant: str, a: int, b: int, col: str) -> float:
             q = m[m.variant == variant].pivot_table(index="case_id", columns="mesh", values=col)
             return float(((q[b] / q[a] - 1).abs() * 100).max())
-        n["MeshBasePninetyfiveFortyEight"] = fmt(change("baseline", 48, 64, "fiber_stress_ratio_p95_abs"), 1)
+        n["MeshBasePninetyfiveFortyEight"] = fmt(change("baseline", 48, 64, "fiber_stress_ratio_p95_abs"), 2)
         n["MeshBasePninetyfiveTwentyFour"] = fmt(change("baseline", 24, 64, "fiber_stress_ratio_p95_abs"), 1)
         n["MeshStrictPninetyfiveFortyEight"] = fmt(change("strict", 48, 64, "fiber_stress_ratio_p95_abs"), 0)
         st = m[m.variant == "strict"].max_fiber_stress_ratio_abs
         n["MeshStrictMaxLow"], n["MeshStrictMaxHigh"] = fmt(st.min(), 2), fmt(st.max(), 2)
         n["MeshTimeSixtyFour"] = int(round(m[m.mesh == 64].wall_time_s.median() / 60))
+    # Review additions: GA margin, helical reach, cylinder-critical ratio, BC ablation
+    margin = ga.python_corrected_fibre_fi_p95 / ga.calculix_fibre_fi_p95 - 1
+    n["GaMarginMin"], n["GaMarginMax"] = f"{margin.min() * 100:.0f}\\,\\%", f"{margin.max() * 100:.0f}\\,\\%"
+    ratios = [c["geometry"]["inner_radius_mm"] * math.sin(math.radians(min(c["winding"]["helical_angles_deg"])))
+              / c["geometry"]["boss_radius_mm"] for c in cases]
+    reach = [x for x in ratios if x <= 1]
+    n["NreachBelowNinety"] = sum(x < 0.9 for x in reach)
+    n["NreachNearOne"] = sum(x >= 0.9 for x in reach)
+    n["ReachMin"] = fmt(min(reach), 2)
+    n["ReachAngleMin"] = f"{math.degrees(math.asin(min(reach))):.0f}"
+    n["ReachAngleNinety"] = f"{math.degrees(math.asin(0.9)):.0f}"
+    cyl = df[df.calculix_fiber_proxy_zone == "cylinder"].fiber_correction_ratio_calculix_over_python
+    n["CcylMedian"], n["CcylMax"] = fmt(cyl.median(), 2), fmt(cyl.max(), 2)
+    bc = DATA / "paper_bc_minimal_pins.csv"
+    if bc.exists() and m is not None:
+        b = pd.read_csv(bc).set_index("case_id")
+        ref = m[(m.variant == "baseline") & (m.mesh == 24)].set_index("case_id")
+        dmax = ((b.max_fiber_stress_ratio_abs / ref.max_fiber_stress_ratio_abs.loc[b.index] - 1).abs() * 100).max()
+        dp95 = ((b.fiber_stress_ratio_p95_abs / ref.fiber_stress_ratio_p95_abs.loc[b.index] - 1).abs() * 100).max()
+        n["BcMaxChange"], n["BcPninetyfiveChange"] = fmt(dmax, 1), fmt(dp95, 1)
+        n["BcSameZone"] = int((b.fiber_proxy_zone == ref.fiber_proxy_zone.loc[b.index]).sum())
+    if m is not None:
+        q = m[(m.variant == "strict") & (m.case_id == "11l_0122")].set_index("mesh").max_fiber_stress_ratio_abs
+        n["StrictPeakTwentyFour"], n["StrictPeakFortyEight"], n["StrictPeakSixtyFour"] = (fmt(q.loc[k], 2) for k in (24, 48, 64))
+        plies = m[m.variant == "baseline"].pivot_table(index="case_id", columns="mesh", values="fiber_proxy_ply_name", aggfunc="first")
+        n["NhoopAtTwentyFour"] = int(plies[24].str.startswith("hoop").sum())
+        n["NtransitionAtSixtyFour"] = int(plies[64].str.startswith("transition").sum())
     lines = ["% Generated by code/paper/make_paper_figures.py; do not edit."]
     lines += [f"\\newcommand{{\\{k}}}{{{v}}}" for k, v in n.items()]
     lines += ["\\providecommand{\\MeshPeakLow}{?}", "\\providecommand{\\MeshPeakHigh}{?}"]

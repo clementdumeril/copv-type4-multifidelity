@@ -25,7 +25,7 @@ DATA = REPO / "data"
 FIG = REPO / "figures"
 
 ZONES = ["cylinder", "junction", "left_dome", "right_dome", "boss"]
-ZONE_LABELS = ["cylinder", "dome-cylinder\njunction", "dome\n(fixed boss)", "dome\n(sliding boss)", "boss\nedge"]
+ZONE_LABELS = ["cylinder", "dome-cylinder\njunction", "left dome", "right dome", "boss\nedge"]
 
 
 def hero() -> None:
