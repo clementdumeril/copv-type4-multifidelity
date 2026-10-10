@@ -1,0 +1,5 @@
+variant,mesh,case_id,solver_status,max_fiber_stress_ratio_abs,fiber_stress_ratio_p95_abs,fiber_stress_ratio_p99_abs,fiber_proxy_zone,fiber_proxy_ply_name,fiber_proxy_local_angle_deg,failure_stress_samples
+axial_constraint=minimal_pins,24,11l_0122,ccx_completed,0.824218273040579,0.4216926099750247,0.5653555851922297,left_dome,hoop_2_minus,-87.85,91392
+axial_constraint=minimal_pins,24,11l_0318,ccx_completed,0.5664010282807463,0.26237071274615426,0.31573286379589854,left_dome,hoop_1_minus,-88.67,102816
+axial_constraint=minimal_pins,24,11l_0136,ccx_completed,0.729348419070023,0.3437926359102895,0.4720395944756355,left_dome,hoop_3_plus,88.56,91392
+axial_constraint=minimal_pins,24,11l_0007,ccx_completed,0.5204440776416887,0.37512447359349954,0.47812166861391403,cylinder,hoop_1_minus,-86.54,91392

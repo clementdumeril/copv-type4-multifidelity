@@ -10,6 +10,8 @@
 \usepackage[numbers,sort&compress]{natbib}
 \usepackage{xcolor}
 \usepackage[colorlinks=true,linkcolor=blue!50!black,citecolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
+\hypersetup{pdftitle={Learning a dome correction for Type IV hydrogen vessel sizing from 384 shell simulations, and an audit of the high-fidelity target},
+  pdfauthor={Cl\'ement Dumeril}}
 \usepackage{caption}
 \captionsetup{font=small,labelfont=bf}
 \graphicspath{{figures/}}
@@ -26,20 +28,20 @@
 \maketitle
 
 \begin{abstract}
-Genetic-algorithm layup optimizers for Type~IV hydrogen vessels rely on sizing models that run in about a millisecond and ignore the dome. I built a CalculiX shell model of the whole vessel with geodesic winding, solved \NdoeCases{} designs of an 11\,L vessel, and trained a multilayer perceptron (MLP) to predict the ratio $C$ between the maximum fiber failure index of the shell model and that of a thick-cylinder model. On this dataset the MLP reaches a cross-validated $R^2$ of \RtwoCvMlp{} on $\log C$ (ridge regression: \RtwoCvRidge{}) and \RtwoEvalMlp{} on \NevalCases{} held-out designs. Inside the optimizer, the corrected index stays above the 95th percentile of the shell-model index for all \NgaDesigns{} optimized designs, but above its maximum for only \NgaConsMax{}. An audit of the target explains this gap. The maximum sits at the polar opening in \NpeakAtPole{} designs and is not mesh-converged. It depends on a coverage floor that keeps part of every ply below its turnaround radius, and \NdoeInconsistent{} designs pair a helical angle and a boss radius that geodesic winding cannot connect. Computed on the mesh-converged 95th percentile, $C$ is within 10\,\% of 1 for \NCninetyfiveWithinTen{} of \NdoeCases{} designs, and on the geometrically consistent designs no corrector generalizes. The learned correction is therefore a correction of a numerical peak, useful as a conservative margin, not evidence of a physical dome effect.
+Genetic-algorithm layup optimizers for Type~IV hydrogen vessels rely on sizing models that run in about a millisecond and ignore the dome. I built a CalculiX shell model of the whole vessel with geodesic winding, solved \NdoeCases{} designs of an 11\,L vessel, and trained a multilayer perceptron (MLP) to predict the ratio $C$ between the maximum fiber failure index of the shell model and that of a thick-cylinder model. On this dataset the MLP reaches a cross-validated $R^2$ of \RtwoCvMlp{} on $\log C$ (ridge regression: \RtwoCvRidge{}) and \RtwoEvalMlp{} on \NevalCases{} held-out designs. Inside the optimizer, the corrected index stays above the 95th percentile of the shell-model index for all \NgaDesigns{} optimized designs, but above its maximum for only \NgaConsMax{}. An audit of the target explains this gap. The maximum sits at the polar opening in \NpeakAtPole{} designs and is not mesh-converged; even the ply in which it occurs changes with the mesh. It depends on a coverage floor that keeps part of every ply below its turnaround radius, and in \NdoeInconsistent{} designs no helical ply can reach the polar opening at all. The 95th percentile of the shell index is mesh-converged and lies within 10\,\% of the fast-model maximum for \NCninetyfiveWithinTen{} of \NdoeCases{} designs. With plies stopped at their turnaround, on the \NdoeConsistent{} designs where that is possible, the MLP overfits and linear models keep only part of the signal on a target that is itself not converged. The corrected optimizer remains conservative with respect to the converged 95th percentile (margin \GaMarginMin{} to \GaMarginMax{}). The learned correction is a correction of a numerical peak, usable as a conservative margin, not evidence of a physical dome effect.
 \end{abstract}
 
 \section{Introduction}
 
 Type~IV vessels store hydrogen at \SIrange{35}{70}{MPa} in a polymer liner overwrapped with filament-wound carbon/epoxy. Burst is usually governed by fiber failure, and the dome, the dome--cylinder junction and the boss region are where geometry, winding angle and thickness change fastest \cite{Leh2015,Hu2021,Jois2021}. Layup optimization by genetic algorithm (GA) evaluates tens of thousands of stacks, so the structural model inside the loop has to be cheap. The optimizer studied here uses an analytical thick-cylinder model that is accurate for the cylindrical section and blind to the domes.
 
-The initial question was whether a correction learned from a dome-resolved finite-element model can make such an optimizer aware of the dome without slowing it down or modifying its code. Answering it required a closer look at the finite-element target itself, and that look changed the answer.
+The initial question was whether a correction learned from a dome-resolved finite-element model can make such an optimizer aware of the dome without slowing it down or modifying its code. Section~\ref{sec:audit} shows that the target itself is unreliable.
 
 Contributions:
 \begin{itemize}
 \item A pipeline that couples a CalculiX composite-shell model, a \NdoeCases{}-case design of experiments (DOE), a correction model compared with linear baselines on two extrapolation regimes, and the GA, with every optimized design re-solved in CalculiX.
 \item An audit of the high-fidelity target: location of the peak, mesh study up to $64\times64$ elements, ablation of the ply-coverage law near the pole, and a check of the geometric consistency of the DOE.
-\item A re-analysis with the mesh-converged quantity and the consistent designs, and a comparison of the shell model with six published burst tests, one of which it does not reproduce.
+\item A re-analysis with the mesh-converged quantity and with plies stopped at their turnaround radius, and a comparison of the shell model with six published burst tests, one of which it does not reproduce.
 \end{itemize}
 
 \section{Related work}
@@ -54,7 +56,7 @@ Progressive-failure finite-element models of Type~IV vessels reproduce burst pre
 The fast model belongs to an existing GA code that the author did not write. Each ply of the cylindrical wall is a cylindrically orthotropic layer; continuity of radial displacement and radial stress at every interface gives a linear system for the stresses under internal pressure \cite{Lekhnitskii1963}. Ply stresses are rotated into the material frame and checked with the Hashin, Tsai--Wu and Puck criteria. One evaluation takes under a millisecond. The model has no dome, no boss and no change of winding angle; in all \NdoeCases{} designs it places the critical point in the cylinder.
 
 \subsection{Dome-resolved shell model}
-The reference model covers the cylinder, both domes and the polar openings with eight-node reduced-integration shells (S8R) in CalculiX 2.23 \cite{Dhondt2024}. The meridian profile is hemispherical, isotensoid-like or a variable contour. Each element carries its own composite section with local ply angles and thicknesses. Helical and transition plies follow the geodesic law $\sin\alpha(r) = r_t/r$, where $r_t = R\sin\alpha_0$ is the turnaround radius of a ply wound at $\alpha_0$ on the cylinder of radius $R$; hoop plies keep their nominal angle (86.5 to 89.5\textdegree). Near its turnaround radius a ply's thickness is multiplied by a logistic coverage weight, which tends to a floor $\varepsilon$ below that radius ($\varepsilon$ is sampled between 0.20 and 0.35). The liner is not modelled. One boss is fixed axially and the other slides, so the vessel elongates without an artificial axial clamp. The internal pressure is applied with \texttt{*DLOAD}, the axial force on the polar openings with \texttt{*CLOAD}, and the analysis is linear static. Table~\ref{tab:material} gives the lamina properties.
+The reference model covers the cylinder, both domes and the polar openings with eight-node reduced-integration shells (S8R) in CalculiX 2.23 \cite{Dhondt2024}. The meridian profile is hemispherical, isotensoid-like or a variable contour. Each element carries its own composite section with local ply angles and thicknesses. Helical and transition plies follow the geodesic law $\sin\alpha(r) = r_t/r$, where $r_t = R\sin\alpha_0$ is the turnaround radius of a ply wound at $\alpha_0$ on the cylinder of radius $R$; hoop plies keep their nominal angle (86.5 to 89.5\textdegree). Near its turnaround radius a ply's thickness is multiplied by a logistic coverage weight, which tends to a floor $\varepsilon$ below that radius ($\varepsilon$ is sampled between 0.20 and 0.35). A geodesic ply does not exist below $r_t$; the code nevertheless keeps the floor there and assigns the ply an angle of $\arcsin(\min(r_t/r, 0.999)) \approx 87$\textdegree, a numerical convention rather than a winding law. The liner is not modelled. One boss is fixed axially and the other slides, so the vessel elongates without an artificial axial clamp. The internal pressure is applied with \texttt{*DLOAD}, the axial force on the polar openings with \texttt{*CLOAD}, and the analysis is linear static. Table~\ref{tab:material} gives the lamina properties.
 
 \begin{table}[t]
 \centering
@@ -133,7 +135,7 @@ Held-out, all \NevalCases{} & \MetricsTableEval \\
 \label{fig:scatter}
 \end{figure}
 
-The fast model always reports the cylinder as critical; the shell model reports a dome in \NdomeCritical{} designs, the cylinder in \NcylCritical{}, the junction in \NjunctionCritical{} and the boss edge in \NbossCritical{} (Fig.~\ref{fig:zones}). The dome peak is always on the side of the axially fixed boss.
+The fast model always reports the cylinder as critical; the shell model reports a dome in \NdomeCritical{} designs, the cylinder in \NcylCritical{}, the junction in \NjunctionCritical{} and the boss edge in \NbossCritical{} (Fig.~\ref{fig:zones}). The dome peak is always at the left pole; Section~\ref{sec:audit} traces this to the case generator.
 
 \begin{figure}[t]
 \centering
@@ -152,44 +154,50 @@ Ten GA runs with different seeds gave \NgaDesigns{} distinct designs, all with 1
 \end{figure}
 
 \section{Audit of the high-fidelity target}
+\label{sec:audit}
 
 \subsection{Where the maximum is}
-In \NpeakAtPole{} of the \NdoeCases{} designs the maximum lies within 1.25 boss radii of the axis, that is in the ring of elements at the polar opening (\texttt{data/baseline\_fiber\_peak\_location.csv}). In \NdomeCriticalHoop{} of the \NdomeCritical{} dome-critical designs it is in a hoop ply, a ply that real winding does not place in the dome.
+In \NpeakAtPole{} of the \NdoeCases{} designs the maximum lies within 1.25 boss radii of the axis, that is in the ring of elements at the polar opening (\texttt{data/baseline\_fiber\_peak\_location.csv}). In \NdomeCriticalHoop{} of the \NdomeCritical{} dome-critical designs it is in a hoop ply, a ply that real winding does not place in the dome. All dome-critical designs peak at the left pole ($z<0$). This is not caused by the axial boundary condition: re-solving the four designs of Section~\ref{sec:mesh} with no boss ring clamped (three-point support) changes the maximum by at most \BcMaxChange\,\% and the 95th percentile by at most \BcPninetyfiveChange\,\%, and the critical zone stays the same in \BcSameZone{} of 4 (\texttt{data/paper\_bc\_minimal\_pins.csv}). The cause is in the case generator: the element ring next to the right polar opening is labelled ``boss'' and the one next to the left opening ``dome'', so the two poles are not modelled identically.
 
 \subsection{Mesh study}
-Four designs were re-solved at 16, 24, 32, 48 and 64 elements per direction: three dome-critical designs close to the median $C$, one per dome shape, and design \texttt{11l\_0007}, whose maximum is in the cylinder at $24\times24$ (Fig.~\ref{fig:mesh}, \texttt{data/paper\_mesh\_study.csv}; no stress sampling was applied). With the DOE coverage law (top row), the 95th percentile changes by at most \MeshBasePninetyfiveFortyEight\,\% between 48 and 64 and by at most \MeshBasePninetyfiveTwentyFour\,\% between 24 and 64: it is converged at the DOE mesh. The maximum and the 99th percentile are not. They vary non-monotonically, the critical ply changes with the mesh, and for \texttt{11l\_0007} the critical zone moves from the cylinder to the dome above $24\times24$. For design \texttt{11l\_0122} the maximum goes from \MeshPeakLow{} to \MeshPeakHigh{}.
+\label{sec:mesh}
+Four designs were re-solved at 16, 24, 32, 48 and 64 elements per direction: three dome-critical designs close to the median $C$, one per dome shape, and design \texttt{11l\_0007}, whose maximum is in the cylinder at $24\times24$ (Fig.~\ref{fig:mesh}, \texttt{data/paper\_mesh\_study.csv}; no stress sampling was applied). With the DOE coverage law (top row), the 95th percentile changes by at most \MeshBasePninetyfiveFortyEight\,\% between 48 and 64 and by at most \MeshBasePninetyfiveTwentyFour\,\% between 24 and 64: it is converged at the DOE mesh. The maximum and the 99th percentile are not. They vary non-monotonically; for design \texttt{11l\_0122} the maximum goes from \MeshPeakLow{} at $16\times16$ to \MeshPeakHigh{} at $64\times64$, and for \texttt{11l\_0007} the critical zone moves from the cylinder to the dome above $24\times24$. The critical ply also changes: it is a hoop ply in \NhoopAtTwentyFour{} of the 4 designs at $24\times24$ and a transition ply in \NtransitionAtSixtyFour{} of 4 at $64\times64$. The ``hoop ply'' attribution of the DOE is therefore itself a product of the mesh.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{fig_mesh.pdf}
-\caption{Fiber index against mesh density for four designs, with the DOE coverage law (top) and with plies stopped at their turnaround radius (bottom).}
+\caption{Fiber index against mesh density for four designs, with the DOE coverage law (top) and with plies stopped at their turnaround radius (bottom). The dotted line marks the $24\times24$ mesh of the DOE.}
 \label{fig:mesh}
 \end{figure}
 
 \subsection{Coverage law and geometric consistency}
-Removing hoop coverage from the dome does not lower the peak of design \texttt{11l\_0122}: it rises from \HoopZeroBefore{} to \HoopZeroAfter{} and moves to a transition ply at the same radius. The mechanism is general. Below its turnaround radius, a ply's geodesic angle tends to 90\textdegree, so any ply kept there by the coverage floor is nearly circumferential and carries the hoop strain of the pole, whatever its thickness.
+Removing hoop coverage from the dome does not lower the peak of design \texttt{11l\_0122}: it rises from \HoopZeroBefore{} to \HoopZeroAfter{} and moves to a transition ply at the same radius. Any ply that the coverage floor keeps below its turnaround radius is, by the code's convention, almost circumferential there, so it carries the hoop strain of the pole whatever its thickness.
 
-The coverage floor also hides an inconsistency of the DOE. In \NdoeInconsistent{} of the \NdoeCases{} designs the helical turnaround radius $R\sin\alpha_0$ is larger than the boss radius, so no geodesic ply can reach the polar opening, and the floor is what covers the pole.
+The floor also hides a geometric problem in the DOE. A helical ply wound geodesically turns around at $r_t = R\sin\alpha_0$, and to cover the polar opening without crossing it, $r_t$ must equal the boss radius to within a band width, that is $\alpha_0 \approx \arcsin(r_{\mathrm{boss}}/R)$. In \NdoeInconsistent{} of the \NdoeCases{} designs $r_t > r_{\mathrm{boss}}$: no helical ply reaches the polar opening, and the floor is what covers the pole. Among the remaining \NdoeConsistent{}, \NreachBelowNinety{} have $r_t < 0.9\,r_{\mathrm{boss}}$ (minimum \ReachMin{}): their helical plies would reach the edge of the opening at \ReachAngleMin\textdegree{} to \ReachAngleNinety\textdegree{} instead of 90\textdegree{}, which is not windable either. Only \NreachNearOne{} designs are close to consistent.
 
-I re-solved the \NdoeConsistent{} consistent designs with every ply stopped at its own turnaround radius (``strict''; weights below 5\,\% are dropped). The maximum increases (median $C$ \CstrictMedian{}, up to \CstrictMax{}) and the peak stays in a dome in \NstrictDome{} designs, now mostly in transition and helical plies. This variant is not mesh-converged either (Fig.~\ref{fig:mesh}, bottom): the maximum varies between \MeshStrictMaxLow{} and \MeshStrictMaxHigh{} without trend, and even the 95th percentile moves by up to \MeshStrictPninetyfiveFortyEight\,\% between 48 and 64. Dropping plies creates thickness steps that the coverage floor had smoothed out.
+I re-solved the \NdoeConsistent{} designs with $r_t \le r_{\mathrm{boss}}$ with every ply stopped at its own turnaround radius (``strict''; weights below 5\,\% are dropped). The maximum increases (median $C$ \CstrictMedian{}, up to \CstrictMax{}) and stays in a dome in \NstrictDome{} designs, now mostly in transition and helical plies. This variant is not mesh-converged either (Fig.~\ref{fig:mesh}, bottom): for design \texttt{11l\_0122} the maximum is \StrictPeakTwentyFour{} at $24\times24$, \StrictPeakFortyEight{} at $48\times48$ and \StrictPeakSixtyFour{} at $64\times64$, and even the 95th percentile moves by up to \MeshStrictPninetyfiveFortyEight\,\% between 48 and 64. Dropping plies creates thickness steps that the coverage floor had smoothed out. Since most of these designs are not windable as sampled, the strict variant is a sensitivity test, not a corrected reference.
 
 \subsection{Learning other targets}
-Table~\ref{tab:targets} and Fig.~\ref{fig:targets} repeat the learning protocol on three other targets. On the mesh-converged 95th percentile of the original model, $C$ has a median of \CninetyfiveMedian{} (range \CninetyfiveMin{}--\CninetyfiveMax{}) and is within 10\,\% of 1 for \NCninetyfiveWithinTen{} of \NdoeCases{} designs: away from the polar opening, the fast cylinder model and the shell model agree. Little is left to learn (MLP: \RtwoCvMlpPninetyfive{} in CV, \RtwoEvalMlpPninetyfive{} held out). On the \NdoeConsistent{} consistent designs (\NstrictTrain{} for training, \NstrictEval{} held out), none of the models generalizes; the best held-out score is \RtwoEvalRidgeStrictPninetyfive{} for ridge regression on the 95th percentile, and the MLP overfits.
+Table~\ref{tab:targets} and Fig.~\ref{fig:targets} repeat the learning protocol on other targets. The 95th percentile of the shell index lies within 10\,\% of the fast-model maximum for \NCninetyfiveWithinTen{} of \NdoeCases{} designs (median ratio \CninetyfiveMedian{}, range \CninetyfiveMin{}--\CninetyfiveMax{}). The two quantities are different statistics, and the percentile is taken over (element, ply) pairs without area weighting, so this indicates that the bulk of the shell solution is at the level predicted by the fast model rather than a pointwise agreement; where the shell maximum is in the cylinder, it is still \CcylMedian{} times the fast value at the median (up to \CcylMax{}). Little is left to learn on this target (MLP: \RtwoCvMlpPninetyfive{} in CV, \RtwoEvalMlpPninetyfive{} held out, with a constant-model RMSE of only 0.066 on $\log C$).
+
+Restricting the original target to the \NdoeConsistent{} designs with $r_t \le r_{\mathrm{boss}}$ (\NstrictTrain{} for training, \NstrictEval{} held out) keeps it learnable, so the subset alone does not explain what follows. On the strict targets the MLP overfits on \NstrictTrain{} training designs (its hyperparameters were not re-tuned), while the linear models keep part of the signal: on the strict 95th percentile, ridge regression reaches \RtwoEvalRidgeStrictPninetyfive{} held out with an RMSE of 0.085 against 0.290 for the constant. That target is itself not mesh-converged, so this signal cannot be taken at face value.
 
 \begin{table}[t]
 \centering
-\caption{$R^2$ on $\log C$ for four targets, same protocol (CV / held-out). Files: \texttt{data/extended\_statistical\_metrics*.json}.}
+\caption{Learning protocol on five targets (all on $\log C$). $n$: training/held-out designs. RMSE$_0$: held-out RMSE of the constant model. For ridge and MLP: CV $R^2$, held-out $R^2$ with a bootstrap 95\,\% interval (2000 resamples), held-out RMSE. Files: \texttt{data/extended\_statistical\_metrics*.json}.}
 \label{tab:targets}
-\small
-\begin{tabular}{lcccccc}
+\scriptsize
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{lcc|ccc|ccc}
 \toprule
- & \multicolumn{2}{c}{OLS} & \multicolumn{2}{c}{Ridge} & \multicolumn{2}{c}{MLP} \\
-Target & CV & held-out & CV & held-out & CV & held-out \\
+ & & & \multicolumn{3}{c|}{Ridge} & \multicolumn{3}{c}{MLP} \\
+Target & $n$ & RMSE$_0$ & CV & held-out & RMSE & CV & held-out & RMSE \\
 \midrule
-Maximum, DOE coverage (original) & \TargetRowBaselineMax \\
-95th percentile, DOE coverage & \TargetRowBaselinePninetyfive \\
-Maximum, strict (\NdoeConsistent{} designs) & \TargetRowStrictMax \\
-95th percentile, strict (\NdoeConsistent{} designs) & \TargetRowStrictPninetyfive \\
+Maximum (original) & \TargetRowBaselineMax \\
+Maximum, $r_t \le r_{\mathrm{boss}}$ & \TargetRowBaselineMaxSubset \\
+95th percentile & \TargetRowBaselinePninetyfive \\
+Maximum, strict & \TargetRowStrictMax \\
+95th percentile, strict & \TargetRowStrictPninetyfive \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -197,7 +205,7 @@ Maximum, strict (\NdoeConsistent{} designs) & \TargetRowStrictMax \\
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.6\linewidth]{fig_targets.pdf}
-\caption{Distribution of the correction factor for the four targets (log scale).}
+\caption{Distribution of the correction factor for four targets (log scale).}
 \label{fig:targets}
 \end{figure}
 
@@ -216,22 +224,22 @@ Source & Vessel & Measured [MPa] & Model [MPa] & Gap \\
 Hu et al.\ 2021 \cite{Hu2021} & H$_2$, first fiber damage & 161.0 & 148.7 & $-7.6\,\%$ \\
 Agne et al.\ 2025 \cite{Agne2025} & GFRP & 29.39 & 25.4--27.7 & $-6$ to $-14\,\%$ \\
 Agne et al.\ 2025 \cite{Agne2025} & CFRP & 27.04 & 25.7--25.9 & $-4$ to $-5\,\%$ \\
-Jin et al.\ 2022 \cite{Jin2022} & EX-A & 65.20 & 58.6 & $-10\,\%$ \\
-Jin et al.\ 2022 \cite{Jin2022} & EX-B & 65.17 & 50.8 & $-22\,\%$ \\
+Jin et al.\ 2024 \cite{Jin2022} & EX-A & 65.20 & 58.6 & $-10\,\%$ \\
+Jin et al.\ 2024 \cite{Jin2022} & EX-B & 65.17 & 50.8 & $-22\,\%$ \\
 L\"uders et al.\ 2025 \cite{Lueders2025} & SN03, layup book & 25.37 & 6.5 & $-74\,\%$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \section{Discussion and limitations}
-\paragraph{What holds.} The pipeline works end to end and is reproducible. Away from the polar opening, the fast cylinder model and the shell model agree to within 10\,\% for nearly all designs, which is itself a useful result for the optimizer. On the original dataset the MLP learns $C$ well ($R^2$ \RtwoCvMlp{} in CV, \RtwoEvalMlp{} held out), and in the GA the corrected index removes the systematic optimism of the fast model with respect to the converged 95th percentile.
+\paragraph{What holds.} The pipeline works end to end and is reproducible. The 95th percentile of the shell index is mesh-converged at the DOE mesh and close to the fast-model value for nearly all designs. In the optimizer, the corrected index is above that converged 95th percentile for all \NgaDesigns{} designs, by \GaMarginMin{} to \GaMarginMax{}, whereas the uncorrected fast index is below it for all of them. On its own dataset the MLP learns $C$ well ($R^2$ \RtwoCvMlp{} in CV, \RtwoEvalMlp{} held out).
 
-\paragraph{What does not.} The quantity the MLP learns is dominated by the maximum at the polar opening. That maximum is not mesh-converged, depends on a coverage floor that has no physical counterpart, and in about half of the designs fills a geometric gap that real winding could not fill. The $R^2$ of \RtwoCvMlp{} measures how well a model reproduces this numerical target, not a physical dome effect, and the corrected optimizer is not conservative with respect to it. When the target is made physically consistent, it becomes mesh-dependent and no corrector generalizes.
+\paragraph{What does not.} The quantity the MLP learns is dominated by the maximum at the polar opening. That maximum is not mesh-converged, its critical ply changes with the mesh, it depends on a coverage floor that has no physical counterpart, it sits on the pole that the generator labels differently, and in most designs it fills a gap that the sampled winding angle could not fill. The $R^2$ of \RtwoCvMlp{} measures how well a model reproduces this numerical target, not a physical dome effect, and the corrected optimizer is not conservative with respect to it. With plies stopped at their turnaround, the target becomes mesh-dependent; the MLP overfits and linear models keep only part of the signal.
 
-\paragraph{Other limitations.} Linear elastic shells, no liner, no progressive damage, no residual winding stress and no liner--boss contact in the DOE (tested separately on two designs: the penalty stiffness moved stresses by about 0.3\,\%, tied versus penalty contact by 7.5 to 8\,\%, and frictional contact did not run reliably). One vessel family. The optimizer is not public, so the GA check cannot be re-run from the repository.
+\paragraph{Other limitations.} Linear elastic shells, no liner, no progressive damage, no residual winding stress and no liner--boss contact in the DOE (tested separately on two designs: the penalty stiffness moved stresses by about 0.3\,\%, tied versus penalty contact by 7.5 to 8\,\%, and frictional contact did not run reliably). The MLP hyperparameters were set for 288 training designs and not re-tuned for 138. No dome-only, area-weighted converged indicator was computed. One vessel family. The optimizer is not public, so the GA check cannot be re-run from the repository.
 
 \section{Conclusion and future work}
-A correction learned from \NdoeCases{} shell solutions can be coupled to a cylinder-only optimizer without slowing it down, and on its own dataset it reaches a cross-validated $R^2$ of \RtwoCvMlp{}. Auditing the target shows that what it corrects is mostly a mesh-dependent peak at the polar opening, produced by a coverage law and by geometrically inconsistent designs. The next steps are a DOE that samples the helical angle from the boss radius ($\alpha_0 \ge \arcsin(r_{\mathrm{boss}}/R)$), a tow-accumulation model at the turnaround instead of a coverage floor \cite{Wang2022}, a solid or locally refined model of the polar region, and a mesh-converged target checked against the measured liner contour of the DLR vessel before any further training.
+A correction learned from \NdoeCases{} shell solutions can be coupled to a cylinder-only optimizer without slowing it down, and on its own dataset it reaches a cross-validated $R^2$ of \RtwoCvMlp{}. Auditing the target shows that what it corrects is mostly a mesh-dependent peak at the polar opening, produced by a coverage law, by an asymmetric labelling of the poles and by helical angles that do not reach the polar opening. The next steps are a DOE that sets the helical angle from the boss radius ($\alpha_0 = \arcsin(r_{\mathrm{boss}}/R)$ to within a band width), symmetric pole modelling, a tow-accumulation model at the turnaround instead of a coverage floor \cite{Wang2022}, a solid or locally refined model of the polar region, and a mesh-converged target checked against the measured liner contour of the DLR vessel before any further training.
 
 \section*{Reproducibility statement}
 All scripts, per-design summaries and figures are in the repository. \path{python code/calibration/extended_statistical_validation.py} reproduces Table~\ref{tab:metrics} in about 3 minutes on a laptop CPU (Intel i7-6700HQ, 4 cores). The campaigns added for this paper use CalculiX 2.23 (Windows build of 15 November 2025) through \path{code/paper/run_campaign.py} with 2 solver threads; a $24\times24$ design takes about 2 minutes and a $64\times64$ design about \MeshTimeSixtyFour{} minutes. The raw result files (about 20\,MB per design) are not versioned. \path{bash paper/build_paper.sh} regenerates the figures, \path{paper/generated/numbers.tex} and this document.

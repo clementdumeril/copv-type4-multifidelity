@@ -19,7 +19,7 @@ The first campaign (128 cases) varied the vessel size widely. After feedback tha
 
 ### Coverage law near the pole
 
-Below its turnaround radius (0.985 R for hoop plies, R sin α for the others), every ply keeps `coverage_epsilon` (0.20 to 0.35) of its thickness, and its geodesic angle tends to 90°. In 179 of the 198 dome-critical designs the peak is in a hoop ply, but the mechanism is not specific to hoops: removing hoop coverage from the dome moves the peak to a transition ply at the same radius and raises it. In 202 of the 384 designs no geodesic ply can reach the polar opening (R sin α larger than the boss radius). See the audit in [`paper/main.pdf`](../paper/main.pdf), section 6, and the data in `data/paper_mesh_study.csv`, `data/fiber_proxy_dataset_strict.csv` and `data/paper_hoop0_11l_0122.csv`.
+Below its turnaround radius (0.985 R for hoop plies, R sin α for the others), every ply keeps `coverage_epsilon` (0.20 to 0.35) of its thickness, and the code assigns it an angle near 87° (a numerical convention: a geodesic ply does not exist there). In 179 of the 198 dome-critical designs the peak is in a hoop ply at the DOE mesh, but the mechanism is not specific to hoops: removing hoop coverage from the dome moves the peak to a transition ply at the same radius and raises it, and at 64×64 the critical ply is a transition ply in all four mesh-study designs. In 202 of the 384 designs no helical ply reaches the polar opening (R sin α larger than the boss radius); of the other 182, 132 have R sin α below 0.9 r_boss, so only about 50 designs are close to windable (α ≈ arcsin(r_boss/R)). The peak always lands on the left pole because the case generator labels the two polar rings differently; removing the axial clamp (`data/paper_bc_minimal_pins.csv`) changes the peak by at most 4 %. See the audit in [`paper/main.pdf`](../paper/main.pdf), section 6, and the data in `data/paper_mesh_study.csv`, `data/fiber_proxy_dataset_strict.csv` and `data/paper_hoop0_11l_0122.csv`.
 
 Case roles are fixed in [`data/doe_11l_single_boss_cases.json`](../data/doe_11l_single_boss_cases.json): 288 train, 48 in-distribution holdout, 24 geometric boundary, 24 pressure scale.
 
@@ -63,8 +63,8 @@ The comparisons use the same shell model and the same fiber index as the DOE. Ge
 | Hu, Chen & Pan 2021 | 70 MPa H₂ vessel, no dome reinforcement | 161 MPa (first fiber damage) | 148.7 MPa | −7.6 % |
 | Agne et al. 2025 | GFRP | 29.39 MPa | 25.4 to 27.7 MPa | −6 to −14 % |
 | Agne et al. 2025 | CFRP | 27.04 MPa | 25.7 to 25.9 MPa | −4 to −5 % |
-| Jin et al. 2022 | EX-A, 32×32 mesh, p99 | 65.2 MPa | 58.6 MPa | −10 % |
-| Jin et al. 2022 | EX-B, 32×32 mesh, p99 | 65.17 MPa | 50.8 MPa | −22 % |
+| Jin et al. 2024 | EX-A, 32×32 mesh, p99 | 65.2 MPa | 58.6 MPa | −10 % |
+| Jin et al. 2024 | EX-B, 32×32 mesh, p99 | 65.17 MPa | 50.8 MPa | −22 % |
 | Lueders et al. 2025 (DLR) | SN03, simplified layup | 25.37 MPa | 11.8 MPa | −53 % |
 | Lueders et al. 2025 (DLR) | SN03, published layup book | 25.37 MPa | 6.5 MPa | −74 % |
 
@@ -76,9 +76,9 @@ The ranges for Agne span the maximum, p95 and p99 of the fiber index. For Hu, th
 
 ## Mesh study
 
-The mesh study uses vessels EX-A and EX-B of Jin et al. 2022, at 16, 24 and 32 elements per direction ([`data/jin2022_mesh_convergence.csv`](../data/jin2022_mesh_convergence.csv)).
+The mesh study uses vessels EX-A and EX-B of Jin et al. 2024 (online 2022), at 16, 24 and 32 elements per direction ([`data/jin2022_mesh_convergence.csv`](../data/jin2022_mesh_convergence.csv)).
 
-![Mesh study on the Jin et al. 2022 vessels](../figures/jin2022_mesh_convergence.png)
+![Mesh study on the Jin et al. 2024 vessels](../figures/jin2022_mesh_convergence.png)
 
 | Predicted burst (MPa) | 16 | 24 | 32 |
 |---|---:|---:|---:|
