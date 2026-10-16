@@ -1,10 +1,10 @@
 # Validation details
 
-Everything here supports the main [README](../README.md). Numbers come from files in [`data/`](../data).
+These are the details behind the main [README](../README.md). The numbers come from files in [`data/`](../data).
 
 ## Design of experiments
 
-The first campaign (128 cases) varied the vessel size widely. After feedback that this mixed too many effects, the second campaign fixed the internal volume at 11 L ([`code/config/generate_doe_11l.py`](../code/config/generate_doe_11l.py)). All 384 cases were solved in CalculiX.
+My first campaign (128 cases) varied the vessel size widely. After feedback that this mixed too many effects, I fixed the internal volume at 11 L for the second campaign ([`code/config/generate_doe_11l.py`](../code/config/generate_doe_11l.py)). All 384 cases were solved in CalculiX.
 
 | Parameter | Range in the 384-case DOE |
 |---|---|
@@ -19,7 +19,13 @@ The first campaign (128 cases) varied the vessel size widely. After feedback tha
 
 ### Coverage law near the pole
 
-Below its turnaround radius (0.985 R for hoop plies, R sin α for the others), every ply keeps `coverage_epsilon` (0.20 to 0.35) of its thickness, and the code assigns it an angle near 87° (a numerical convention: a geodesic ply does not exist there). In 179 of the 198 dome-critical designs the peak is in a hoop ply at the DOE mesh, but the mechanism is not specific to hoops: removing hoop coverage from the dome moves the peak to a transition ply at the same radius and raises it, and at 64×64 the critical ply is a transition ply in all four mesh-study designs. In 202 of the 384 designs no helical ply reaches the polar opening (R sin α larger than the boss radius); of the other 182, 132 have R sin α below 0.9 r_boss, so only about 50 designs are close to windable (α ≈ arcsin(r_boss/R)). Of the 205 polar peaks, 190 are at the left pole and 15 at the right one. The generator labels the right polar ring "boss" and the left one "dome"; with no zone-dependent material or coverage in the DOE this changes only the zone statistics (right-pole peaks count as "boss edge"), not the model. The physical difference between the poles is not isolated: removing the axial clamp (`data/paper_bc_minimal_pins.csv`) changes the peak by at most 4 %, but the two pinned nodes stay on the left boss and the junction element is not on the same side at both ends. The DOE also applies no end-cap force p·π·r_boss² to the polar edges; adding it (`data/paper_endcap.csv`, four designs at 24×24 and 64×64) raises the maximum by 27 to 54 % and leaves the 95th percentile within 1 %. See the audit in [`paper/main.pdf`](../paper/main.pdf), section 6, and the data in `data/paper_mesh_study.csv`, `data/fiber_proxy_dataset_strict.csv` and `data/paper_hoop0_11l_0122.csv`.
+Below its turnaround radius (0.985 R for hoop plies, R sin α for the others), every ply keeps `coverage_epsilon` (0.20 to 0.35) of its thickness, and the code assigns it an angle near 87° (a numerical convention: a geodesic ply does not exist there). In 179 of the 198 dome-critical designs the peak is in a hoop ply at the DOE mesh, but the mechanism is not specific to hoops. Removing hoop coverage from the dome moves the peak to a transition ply at the same radius and raises it, and at 64×64 the critical ply is a transition ply in all four mesh-study designs.
+
+In 202 of the 384 designs no helical ply reaches the polar opening (R sin α larger than the boss radius); of the other 182, 132 have R sin α below 0.9 r_boss, so only about 50 designs are close to windable (α ≈ arcsin(r_boss/R)).
+
+Of the 205 polar peaks, 190 are at the left pole and 15 at the right one. The generator labels the right polar ring "boss" and the left one "dome"; with no zone-dependent material or coverage in the DOE this changes only the zone statistics (right-pole peaks count as "boss edge"), not the model. The physical difference between the poles is not isolated: removing the axial clamp (`data/paper_bc_minimal_pins.csv`) changes the peak by at most 4 %, but the two pinned nodes stay on the left boss and the junction element is not on the same side at both ends.
+
+The DOE also applies no end-cap force p·π·r_boss² to the polar edges; adding it (`data/paper_endcap.csv`, four designs at 24×24 and 64×64) raises the maximum by 27 to 54 % and leaves the 95th percentile within 1 %. See the audit in [`paper/main.pdf`](../paper/main.pdf), section 6, and the data in `data/paper_mesh_study.csv`, `data/fiber_proxy_dataset_strict.csv` and `data/paper_hoop0_11l_0122.csv`.
 
 Case roles are fixed in [`data/doe_11l_single_boss_cases.json`](../data/doe_11l_single_boss_cases.json): 288 train, 48 in-distribution holdout, 24 geometric boundary, 24 pressure scale.
 
@@ -68,11 +74,7 @@ The comparisons use the same shell model and the same fiber index as the DOE. Ge
 | Lueders et al. 2025 (DLR) | SN03, simplified layup | 25.37 MPa | 11.8 MPa | −53 % |
 | Lueders et al. 2025 (DLR) | SN03, published layup book | 25.37 MPa | 6.5 MPa | −74 % |
 
-The ranges for Agne span the maximum, p95 and p99 of the fiber index. For Hu, the pressure is close, but in the model the first failed ply is a hoop ply in the cylinder, while the paper reports the dome region. The DLR test is not reproduced. With the exact layup, the 22.2° helical layer becomes critical near its turnaround radius. The likely causes are:
-
-- the dome contour, which is a spherical-cap approximation instead of the measured liner contour;
-- the coverage law near the turnaround;
-- the absence of progressive damage.
+The ranges for Agne span the maximum, p95 and p99 of the fiber index. For Hu, the pressure is close, but in the model the first failed ply is a hoop ply in the cylinder, while the paper reports the dome region. The DLR test is not reproduced. With the exact layup, the 22.2° helical layer becomes critical near its turnaround radius. The likely causes are the dome contour (a spherical-cap approximation instead of the measured liner contour), the coverage law near the turnaround, and the absence of progressive damage.
 
 ## Mesh study
 
@@ -91,7 +93,7 @@ The maximum does not converge. The p99 value increases steadily, but it still mo
 
 ## Liner / boss contact
 
-Contact was tested separately on two cases of the first DOE. It was never included in the 384-case DOE.
+I tested contact separately on two cases of the first DOE. It was never included in the 384-case DOE.
 
 - Changing the penalty stiffness moved the stresses by about 0.3 % and the displacements by 3.6 to 4.6 %.
 - Going from tied to penalty contact moved the stresses by 7.5 to 8 %.
