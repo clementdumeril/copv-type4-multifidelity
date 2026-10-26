@@ -18,23 +18,23 @@ The MLP predicts C = FI(CalculiX) / FI(fast model) from the design inputs.
 
 ![Predicted vs CalculiX correction factor on the 96 held-out designs](figures/extended_benchmark_nuage_en.png)
 
-I then ran the optimizer with the corrected model (10 seeds, 17 designs) and re-solved each design in CalculiX at 87 MPa. The corrected index is above the CalculiX 95th percentile for all 17, but above the CalculiX maximum for only 4.
+I then ran the optimizer with the corrected model (10 seeds, 17 designs) and re-solved each design in CalculiX at 87 MPa (the optimizer's design burst pressure; not stored in `data/ga_statistical_validation.csv`). The corrected index is above the CalculiX 95th percentile for all 17, but above the CalculiX maximum for only 4.
 
 ## Audit
 
-The target is the maximum of the shell-model fiber index, and in 205 of the 384 designs that maximum sits at the polar opening. It is not mesh-converged: for design 0122 it goes from 0.85 at 16×16 to 1.11 at 64×64, while the 95th percentile changes by about 0.4 % between 48 and 64. The peak also depends on a coverage convention near the pole and on a missing end-cap load. See section 6 of the paper.
+The target is the maximum of the shell-model fiber index, and in 205 of the 384 designs that maximum sits within 1.25 boss radii of the polar opening (190 of them on the axially fixed left boss). It is not mesh-converged: for design 0122 it goes from 0.85 at 16×16 to 1.11 at 64×64, while the 95th percentile changes by about 0.4 % between 48 and 64. The peak also depends on a coverage convention near the pole and on a missing end-cap load. See section 6 of the paper.
 
 ![Fiber index against mesh density for four designs](figures/mesh_study.png)
 
 ## Running it
 
 ```bash
-pip install numpy pandas matplotlib
+pip install -r requirements.txt                              # Python >= 3.10
 python code/calibration/extended_statistical_validation.py   # about 3 min
 bash paper/build_paper.sh                                    # paper figures and PDF (needs latexmk)
 ```
 
-The CalculiX runs use [`code/paper/run_campaign.py`](code/paper/run_campaign.py) with CalculiX 2.23 (set `CCX`). Raw `.frd` files are not versioned.
+The CalculiX runs use [`code/paper/run_campaign.py`](code/paper/run_campaign.py) with CalculiX 2.23 (set `CCX`). Raw `.frd` files are not versioned. These scripts overwrite the committed files in `figures/`, `data/` and `paper/`.
 
 ## Limitations
 

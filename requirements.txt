@@ -1,0 +1,6 @@
+# Python >= 3.10. Figures were made with matplotlib 3.10.6.
+# External tools: CalculiX ccx 2.23 (set CCX), latexmk/pdflatex/bibtex for the paper,
+# optional ParaView 6.1 pvpython for code/plotting/render_fiber_field.py.
+numpy
+pandas
+matplotlib>=3.10
