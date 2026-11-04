@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this code or data, please cite it as below."
+title: "Learning a dome correction for Type IV hydrogen vessel sizing from 384 shell simulations, and an audit of the high-fidelity target"
+authors:
+  - family-names: "Dumeril"
+    given-names: "Clément"
+    affiliation: "University of California, Berkeley"
+repository-code: "https://github.com/clementdumeril/copv-type4-multifidelity"
+license: MIT
+type: software
+keywords:
+  - CalculiX
+  - composite pressure vessel
+  - Type IV hydrogen tank
+  - multi-fidelity
+  - mesh convergence
