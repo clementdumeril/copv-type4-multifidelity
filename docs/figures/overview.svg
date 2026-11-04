@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="636" viewBox="0 0 1200 636" font-family="Arial, Helvetica, sans-serif">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#444"/>
+    </marker>
+  </defs>
+  <rect x="0.75" y="0.75" width="1198.5" height="634.5" rx="16" fill="#FFFFFF" stroke="#D0D7DE" stroke-width="1.5"/>
+
+  <g fill="none" stroke="#8A9AA8" stroke-width="1.2" stroke-dasharray="6 4">
+    <rect x="24" y="24" width="226" height="416" rx="10"/>
+    <rect x="274" y="24" width="390" height="416" rx="10"/>
+    <rect x="688" y="24" width="240" height="416" rx="10"/>
+    <rect x="952" y="24" width="224" height="416" rx="10"/>
+    <rect x="24" y="460" width="1152" height="152" rx="10"/>
+  </g>
+  <g font-size="15" fill="#5A6875" letter-spacing="1.2">
+    <text x="40" y="48">DESIGNS</text>
+    <text x="290" y="48">TWO FIDELITIES</text>
+    <text x="704" y="48">LEARNED CORRECTION</text>
+    <text x="968" y="48">IN THE OPTIMIZER</text>
+    <text x="40" y="484">AUDIT OF THE TARGET</text>
+  </g>
+
+  <!-- inputs -->
+  <rect x="40" y="60" width="194" height="364" rx="10" fill="#FBE5CF" stroke="#C97A2B" stroke-width="1.5"/>
+  <text x="56" y="98" font-size="26" fill="#15202A">384 designs</text>
+  <g font-size="16" fill="#5A6875">
+    <text x="56" y="128">Type IV vessel, 11 L</text>
+    <text x="56" y="152">70 MPa</text>
+    <text x="56" y="188">inner radius</text>
+    <text x="56" y="210">76 to 96 mm</text>
+    <text x="56" y="246">helical angle</text>
+    <text x="56" y="268">12 to 26°</text>
+    <text x="56" y="304">3 dome shapes</text>
+    <text x="56" y="340">288 train</text>
+    <text x="56" y="362">96 held out</text>
+  </g>
+
+  <!-- two fidelities -->
+  <rect x="290" y="60" width="358" height="100" rx="10" fill="#F1F4F6" stroke="#8A9AA8" stroke-width="1.5"/>
+  <text x="306" y="94" font-size="22" fill="#15202A">Fast cylinder model</text>
+  <g font-size="16" fill="#5A6875">
+    <text x="306" y="120">&lt; 1 ms, no dome or boss</text>
+    <text x="306" y="144">existing GA code, reused</text>
+  </g>
+
+  <rect x="290" y="176" width="358" height="248" rx="10" fill="#DCF1EE" stroke="#0D7A6F" stroke-width="1.5"/>
+  <text x="306" y="210" font-size="22" fill="#15202A">CalculiX composite shells</text>
+  <g font-size="16" fill="#5A6875">
+    <text x="306" y="236">S8R, 24 x 24, geodesic plies</text>
+    <text x="306" y="260">about 2 min per design</text>
+  </g>
+  <image href="ov_vessel.png" x="306" y="274" width="220" height="143"/>
+  <text x="540" y="320" font-size="16" fill="#5A6875">fiber index</text>
+  <text x="540" y="342" font-size="16" fill="#5A6875">peaks at the</text>
+  <text x="540" y="364" font-size="16" fill="#5A6875">polar opening</text>
+
+  <!-- learned correction -->
+  <rect x="704" y="60" width="208" height="130" rx="10" fill="#E2EBFA" stroke="#1F5FBF" stroke-width="1.5"/>
+  <text x="720" y="94" font-size="22" fill="#15202A">MLP corrector</text>
+  <text x="720" y="124" font-size="18" fill="#15202A"><tspan font-family="Georgia, serif" font-style="italic">C</tspan> = FI<tspan font-size="13" dy="4">FE</tspan><tspan dy="-4"> / FI</tspan><tspan font-size="13" dy="4">fast</tspan></text>
+  <g font-size="16" fill="#5A6875">
+    <text x="720" y="152">learns log <tspan font-family="Georgia, serif" font-style="italic">C</tspan></text>
+    <text x="720" y="176">24-12 tanh, NumPy</text>
+  </g>
+  <text x="704" y="236" font-size="32" fill="#B8461F">R² 0.862</text>
+  <text x="704" y="260" font-size="16" fill="#5A6875">8-fold CV; Ridge 0.796</text>
+  <image href="ov_scatter.png" x="704" y="276" width="208" height="156"/>
+  <rect x="704" y="276" width="208" height="156" rx="6" fill="none" stroke="#B5C0CA" stroke-width="1"/>
+
+  <!-- optimizer -->
+  <rect x="968" y="60" width="192" height="100" rx="10" fill="#F1F4F6" stroke="#8A9AA8" stroke-width="1.5"/>
+  <text x="984" y="94" font-size="22" fill="#15202A">GA optimizer</text>
+  <g font-size="16" fill="#5A6875">
+    <text x="984" y="120">fast model x <tspan font-family="Georgia, serif" font-style="italic">C</tspan></text>
+    <text x="984" y="144">+ p95 margin</text>
+  </g>
+  <text x="968" y="196" font-size="18" fill="#15202A">17 designs re-solved</text>
+  <text x="968" y="218" font-size="16" fill="#5A6875">in CalculiX at 87 MPa</text>
+  <text x="968" y="266" font-size="30" fill="#15202A">17 / 17</text>
+  <text x="968" y="290" font-size="16" fill="#5A6875">at or above the FE p95</text>
+  <text x="968" y="338" font-size="30" fill="#15202A">4 / 17</text>
+  <text x="968" y="362" font-size="16" fill="#5A6875">at or above the FE max</text>
+  <text x="968" y="404" font-size="16" fill="#5A6875">raw fast model: 0 / 17</text>
+
+  <g stroke="#444" stroke-width="2" fill="none" marker-end="url(#ah)">
+    <path d="M234,110 L288,110"/>
+    <path d="M234,300 L288,300"/>
+    <path d="M648,110 L702,110"/>
+    <path d="M648,240 C676,240 676,150 702,150"/>
+    <path d="M912,110 L966,110"/>
+  </g>
+
+  <!-- band -->
+  <image href="ov_mesh.png" x="40" y="500" width="200" height="104"/>
+  <rect x="40" y="500" width="200" height="104" rx="6" fill="none" stroke="#B5C0CA" stroke-width="1"/>
+  <text x="256" y="524" font-size="18" fill="#15202A">Mesh study</text>
+  <text x="256" y="550" font-size="16" fill="#5A6875">max not converged,</text>
+  <text x="256" y="572" font-size="16" fill="#5A6875">p95 within 0.42 %</text>
+
+  <image href="ov_peak.png" x="440" y="500" width="147" height="104"/>
+  <rect x="440" y="500" width="147" height="104" rx="6" fill="none" stroke="#B5C0CA" stroke-width="1"/>
+  <text x="603" y="524" font-size="18" fill="#15202A">Peak location</text>
+  <text x="603" y="550" font-size="16" fill="#5A6875">FE peaks move to the dome;</text>
+  <text x="603" y="572" font-size="16" fill="#5A6875">205 of 384 next to the boss</text>
+
+  <text x="840" y="524" font-size="18" fill="#15202A">Published burst tests</text>
+  <text x="840" y="550" font-size="16" fill="#5A6875">4 to 22 % low on five tests</text>
+  <text x="840" y="572" font-size="16" fill="#5A6875">DLR 2025 missed by 74 %</text>
+</svg>
