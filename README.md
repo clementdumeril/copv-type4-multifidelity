@@ -80,7 +80,7 @@ python scripts/readme_numbers.py                             # README numbers, ~
 bash paper/build_paper.sh                                    # paper figures, numbers.tex and PDF (needs latexmk)
 ```
 
-These scripts overwrite the committed files in `figures/`, `data/` and `paper/`. To write the metrics elsewhere, set `TYPE4_METRICS_OUT=<path>` and `TYPE4_NO_FIGURES=1`. The CalculiX runs use [`code/paper/run_campaign.py`](code/paper/run_campaign.py) and [`code/high_fidelity/run_calculix_doe.py`](code/high_fidelity/run_calculix_doe.py) with CalculiX 2.23 (set `CCX`). Raw `.frd` files are not versioned.
+These scripts overwrite the committed files in `figures/`, `data/` and `paper/`. To write the metrics elsewhere, set `TYPE4_METRICS_OUT=<path>` and `TYPE4_NO_FIGURES=1`. The CalculiX runs use [`code/paper/run_campaign.py`](code/paper/run_campaign.py) and [`code/high_fidelity/run_calculix_doe.py`](code/high_fidelity/run_calculix_doe.py) with CalculiX 2.23 (Windows build of 15 November 2025, 2 solver threads, set `CCX`); a 24 x 24 design takes about 2 minutes. Raw `.frd` files (about 20 MB per design) are not versioned.
 
 ## Reproducing figures
 
